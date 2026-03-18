@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
   const { action } = body;
   if (action !== "1" && action !== "0") {
     return NextResponse.json(
-      { error: "action must be 'ON' or 'OFF'" },
+      { error: "action must be '1' (on) or '0' (off)" },
       { status: 400 }
     );
   }
