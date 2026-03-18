@@ -1153,7 +1153,7 @@ Authorization: Bearer <session-cookie>
 
 **Request:**
 ```http
-GET /api/adafruit/feeds/sensor-readings/data
+GET /api/adafruit/data?feed=temperature
 Authorization: Bearer <session-cookie>
 ```
 
@@ -1186,7 +1186,7 @@ Authorization: Bearer <session-cookie>
 
 **Request:**
 ```http
-POST /api/adafruit/feeds/sensor-readings/data
+POST /api/adafruit/data
 Content-Type: application/json
 Authorization: Bearer <session-cookie>
 
@@ -1210,7 +1210,7 @@ Authorization: Bearer <session-cookie>
 
 **Request:**
 ```http
-POST /api/adafruit/feeds/irrigation-control/data
+POST /api/adafruit/pump
 Content-Type: application/json
 Authorization: Bearer <session-cookie>
 
