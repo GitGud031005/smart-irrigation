@@ -1,0 +1,131 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Models derived from provided SQL DDL. IDs use BigInt with autoincrement.
+
+model User {
+  id           BigInt  @id @default(autoincrement()) @map("user_id")
+  email        String  @unique
+  passwordHash String  @map("password_hash")
+
+  zones Zone[]
+
+  @@map("USER")
+}
+
+model IrrigationProfile {
+  id              BigInt @id @default(autoincrement()) @map("profile_id")
+  name            String?
+  minMoisture     Float  @map("min_moisture")
+  maxMoisture     Float  @map("max_moisture")
+  wateringDuration Int   @map("watering_duration")
+
+  zones Zone[]
+
+  @@map("IRRIGATION_PROFILE")
+}
+
+model Schedule {
+  id             BigInt  @id @default(autoincrement()) @map("schedule_id")
+  cronExpression String  @map("cron_expression")
+  isActive       Boolean @default(true) @map("is_active")
+
+  // one-to-one relation: Schedule <-> Zone (Zone holds the foreign key `scheduleId`)
+  zone Zone?
+
+  @@map("SCHEDULE")
+}
+
+model Zone {
+  id                 BigInt  @id @default(autoincrement()) @map("zone_id")
+  name               String
+
+  user   User? @relation(fields: [userId], references: [id])
+  userId BigInt?
+
+  profile   IrrigationProfile? @relation(fields: [profileId], references: [id])
+  profileId BigInt?
+
+  // one-to-one: each Zone may have a unique Schedule
+  schedule   Schedule? @relation(fields: [scheduleId], references: [id])
+  scheduleId BigInt? @unique
+
+  currentMoisture   Float @default(0) @map("current_moisture")
+  currentHumidity   Float @default(0) @map("current_humidity")
+  currentTemperature Float @default(0) @map("current_temperature")
+
+  sensors Sensor[]
+  devices Device[]
+  irrigationEvents IrrigationEvent[]
+  alerts Alert[]
+
+  @@map("ZONE")
+}
+
+model Sensor {
+  id         BigInt @id @default(autoincrement()) @map("sensor_id")
+  sensorType String? @map("sensor_type")
+  modelName  String? @map("model")
+
+  zone   Zone? @relation(fields: [zoneId], references: [id])
+  zoneId BigInt?
+
+  readings SensorReading[]
+
+  @@map("SENSOR")
+}
+
+model Device {
+  id         BigInt @id @default(autoincrement()) @map("device_id")
+  deviceType String? @map("device_type")
+
+  zone   Zone? @relation(fields: [zoneId], references: [id])
+  zoneId BigInt?
+
+  @@map("DEVICE")
+}
+
+model SensorReading {
+  id          BigInt   @id @default(autoincrement()) @map("reading_id")
+  sensor      Sensor?  @relation(fields: [sensorId], references: [id])
+  sensorId    BigInt?
+  soilMoisture Float?  @map("soil_moisture")
+  temperature  Float?
+  humidity     Float?
+  recordedAt   DateTime @default(now()) @map("recorded_at")
+
+  @@map("SENSOR_READING")
+}
+
+model IrrigationEvent {
+  id          BigInt   @id @default(autoincrement()) @map("event_id")
+  zone        Zone?    @relation(fields: [zoneId], references: [id])
+  zoneId      BigInt?
+  startTime   DateTime @map("start_time")
+  endTime     DateTime? @map("end_time")
+  duration    Int?
+  triggerType String?  @map("trigger_type")
+
+  @@map("IRRIGATION_EVENT")
+}
+
+model Alert {
+  id        BigInt   @id @default(autoincrement()) @map("alert_id")
+  zone      Zone?    @relation(fields: [zoneId], references: [id])
+  zoneId    BigInt?
+  message   String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("ALERT")
+}
