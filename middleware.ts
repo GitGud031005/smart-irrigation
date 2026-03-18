@@ -1,11 +1,3 @@
-// Next.js middleware - route protection for authenticated pages (FR12)
-// Redirects unauthenticated users to login page
-// Protects all /dashboard/* routes
-
-export const config = {
-  matcher: ["/dashboard/:path*"],
-};
-
 import { NextRequest, NextResponse } from "next/server";
 
 export function middleware(request: NextRequest) {
