@@ -15,7 +15,7 @@ datasource db {
 // Models derived from provided SQL DDL. IDs use BigInt with autoincrement.
 
 model User {
-  id           BigInt  @id @default(autoincrement()) @map("user_id")
+  id           String  @id @default(uuid()) @map("user_id")
   email        String  @unique
   passwordHash String  @map("password_hash")
 
@@ -25,7 +25,7 @@ model User {
 }
 
 model IrrigationProfile {
-  id              BigInt @id @default(autoincrement()) @map("profile_id")
+  id              String @id @default(uuid()) @map("profile_id")
   name            String?
   minMoisture     Float  @map("min_moisture")
   maxMoisture     Float  @map("max_moisture")
@@ -37,7 +37,7 @@ model IrrigationProfile {
 }
 
 model Schedule {
-  id             BigInt  @id @default(autoincrement()) @map("schedule_id")
+  id             String  @id @default(uuid()) @map("schedule_id")
   cronExpression String  @map("cron_expression")
   isActive       Boolean @default(true) @map("is_active")
 
@@ -48,18 +48,18 @@ model Schedule {
 }
 
 model Zone {
-  id                 BigInt  @id @default(autoincrement()) @map("zone_id")
+  id                 String  @id @default(uuid()) @map("zone_id")
   name               String
 
   user   User? @relation(fields: [userId], references: [id])
-  userId BigInt?
+  userId String?
 
   profile   IrrigationProfile? @relation(fields: [profileId], references: [id])
-  profileId BigInt?
+  profileId String?
 
   // one-to-one: each Zone may have a unique Schedule
   schedule   Schedule? @relation(fields: [scheduleId], references: [id])
-  scheduleId BigInt? @unique
+  scheduleId String? @unique
 
   currentMoisture   Float @default(0) @map("current_moisture")
   currentHumidity   Float @default(0) @map("current_humidity")
@@ -74,12 +74,12 @@ model Zone {
 }
 
 model Sensor {
-  id         BigInt @id @default(autoincrement()) @map("sensor_id")
+  id         String @id @default(uuid()) @map("sensor_id")
   sensorType String? @map("sensor_type")
   modelName  String? @map("model")
 
   zone   Zone? @relation(fields: [zoneId], references: [id])
-  zoneId BigInt?
+  zoneId String?
 
   readings SensorReading[]
 
@@ -87,19 +87,19 @@ model Sensor {
 }
 
 model Device {
-  id         BigInt @id @default(autoincrement()) @map("device_id")
+  id         String @id @default(uuid()) @map("device_id")
   deviceType String? @map("device_type")
 
   zone   Zone? @relation(fields: [zoneId], references: [id])
-  zoneId BigInt?
+  zoneId String?
 
   @@map("DEVICE")
 }
 
 model SensorReading {
-  id          BigInt   @id @default(autoincrement()) @map("reading_id")
+  id          String   @id @default(uuid()) @map("reading_id")
   sensor      Sensor?  @relation(fields: [sensorId], references: [id])
-  sensorId    BigInt?
+  sensorId    String?
   soilMoisture Float?  @map("soil_moisture")
   temperature  Float?
   humidity     Float?
@@ -109,9 +109,9 @@ model SensorReading {
 }
 
 model IrrigationEvent {
-  id          BigInt   @id @default(autoincrement()) @map("event_id")
+  id          String   @id @default(uuid()) @map("event_id")
   zone        Zone?    @relation(fields: [zoneId], references: [id])
-  zoneId      BigInt?
+  zoneId      String?
   startTime   DateTime @map("start_time")
   endTime     DateTime? @map("end_time")
   duration    Int?
@@ -121,9 +121,9 @@ model IrrigationEvent {
 }
 
 model Alert {
-  id        BigInt   @id @default(autoincrement()) @map("alert_id")
+  id        String   @id @default(uuid()) @map("alert_id")
   zone      Zone?    @relation(fields: [zoneId], references: [id])
-  zoneId    BigInt?
+  zoneId    String?
   message   String
   createdAt DateTime @default(now()) @map("created_at")
 

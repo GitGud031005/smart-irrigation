@@ -6,7 +6,7 @@ import { toJsonSafe } from '@/lib/utils'
 export async function GET(request: NextRequest, { params }: { params: Promise<{ zoneId: string }> }) {
 	const { zoneId } = await params
 	try {
-		const zone = await getZone(BigInt(zoneId))
+		const zone = await getZone(zoneId)
 		if (!zone) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 		return new NextResponse(JSON.stringify(toJsonSafe(zone)), { headers: { 'Content-Type': 'application/json' } })
 	} catch (err) {
@@ -20,7 +20,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 	let body: any
 	try { body = await request.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
 	try {
-		const zone = await updateZone(BigInt(zoneId), body)
+		const zone = await updateZone(zoneId, body)
 		return new NextResponse(JSON.stringify(toJsonSafe(zone)), { headers: { 'Content-Type': 'application/json' } })
 	} catch (err) {
 		const message = err instanceof Error ? err.message : 'Unknown error'
@@ -31,7 +31,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ zoneId: string }> }) {
 	const { zoneId } = await params
 	try {
-		const zone = await deleteZone(BigInt(zoneId))
+		const zone = await deleteZone(zoneId)
 		return new NextResponse(JSON.stringify(toJsonSafe(zone)), { headers: { 'Content-Type': 'application/json' } })
 	} catch (err) {
 		const message = err instanceof Error ? err.message : 'Unknown error'

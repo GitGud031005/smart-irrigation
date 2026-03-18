@@ -6,7 +6,7 @@ import { toJsonSafe } from '@/lib/utils'
 export async function GET(request: NextRequest, { params }: { params: Promise<{ scheduleId: string }> }) {
 	const { scheduleId } = await params
 	try {
-		const s = await getSchedule(BigInt(scheduleId))
+		const s = await getSchedule(scheduleId)
 		if (!s) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 		return new NextResponse(JSON.stringify(toJsonSafe(s)), { headers: { 'Content-Type': 'application/json' } })
 	} catch (err) {
@@ -20,7 +20,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 	let body: any
 	try { body = await request.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
 	try {
-		const s = await updateSchedule(BigInt(scheduleId), body)
+		const s = await updateSchedule(scheduleId, body)
 		return new NextResponse(JSON.stringify(toJsonSafe(s)), { headers: { 'Content-Type': 'application/json' } })
 	} catch (err) {
 		const message = err instanceof Error ? err.message : 'Unknown error'
@@ -31,7 +31,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ scheduleId: string }> }) {
 	const { scheduleId } = await params
 	try {
-		const s = await deleteSchedule(BigInt(scheduleId))
+		const s = await deleteSchedule(scheduleId)
 		return new NextResponse(JSON.stringify(toJsonSafe(s)), { headers: { 'Content-Type': 'application/json' } })
 	} catch (err) {
 		const message = err instanceof Error ? err.message : 'Unknown error'
