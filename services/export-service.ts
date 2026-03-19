@@ -53,7 +53,7 @@ export async function exportDataCSV(opts: ExportOptions): Promise<string> {
 
 	lines.push('')
 	lines.push('=== Irrigation Events ===')
-	lines.push('id,zoneId,startTime,endTime,duration,triggerType')
+	lines.push('id,zoneId,startTime,endTime,duration')
 	for (const e of events) {
 		lines.push([
 			e.id,
@@ -61,7 +61,6 @@ export async function exportDataCSV(opts: ExportOptions): Promise<string> {
 			e.startTime.toISOString(),
 			e.endTime ? e.endTime.toISOString() : '',
 			e.duration ?? '',
-			e.triggerType ?? '',
 		].join(','))
 	}
 
