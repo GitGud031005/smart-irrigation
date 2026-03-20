@@ -1,11 +1,16 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server'
-import { listIrrigationEvents, createIrrigationEvent } from '@/services/irrigation-service'
+import { queryIrrigationEvents, createIrrigationEvent } from '@/services/irrigation-service'
 import { toJsonSafe } from '@/lib/utils'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+	const { searchParams } = request.nextUrl
+	const zoneId = searchParams.get('zoneId') ?? undefined
+	const since = searchParams.get('since') ? new Date(searchParams.get('since')!) : undefined
+	const until = searchParams.get('until') ? new Date(searchParams.get('until')!) : undefined
+	const take = searchParams.get('take') ? parseInt(searchParams.get('take')!, 10) : undefined
 	try {
-		const events = await listIrrigationEvents()
+		const events = await queryIrrigationEvents({ zoneId, since, until, take })
 		return new NextResponse(JSON.stringify(toJsonSafe(events)), { headers: { 'Content-Type': 'application/json' } })
 	} catch (err) {
 		const message = err instanceof Error ? err.message : 'Unknown error'
