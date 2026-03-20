@@ -4,12 +4,11 @@ import type { IrrigationEvent } from '../lib/generated/prisma/client'
 
 // ─── IrrigationEvent CRUD ─────────────────────────────────────────────────────
 
-export async function createIrrigationEvent(data: { zoneId?: string; startTime: Date; endTime?: Date | null; duration?: number; triggerType?: string }): Promise<IrrigationEvent> {
+export async function createIrrigationEvent(data: { zoneId?: string; startTime: Date; endTime?: Date | null; duration?: number }): Promise<IrrigationEvent> {
 	const payload: any = { startTime: data.startTime }
 	if (data.zoneId) payload.zoneId = data.zoneId
 	if (data.endTime !== undefined) payload.endTime = data.endTime
 	if (data.duration !== undefined) payload.duration = data.duration
-	if (data.triggerType !== undefined) payload.triggerType = data.triggerType
 	return prisma.irrigationEvent.create({ data: payload })
 }
 
@@ -26,7 +25,7 @@ export async function queryIrrigationEvents(opts?: { zoneId?: string; since?: Da
 	return prisma.irrigationEvent.findMany({ where, orderBy: { startTime: 'desc' }, take: opts?.take })
 }
 
-export async function updateIrrigationEvent(id: string, data: Partial<{ endTime: Date | null; duration: number; triggerType: string }>): Promise<IrrigationEvent> {
+export async function updateIrrigationEvent(id: string, data: Partial<{ endTime: Date | null; duration: number }>): Promise<IrrigationEvent> {
 	return prisma.irrigationEvent.update({ where: { id }, data })
 }
 
@@ -34,10 +33,10 @@ export async function deleteIrrigationEvent(id: string): Promise<IrrigationEvent
 	return prisma.irrigationEvent.delete({ where: { id } })
 }
 
-/** Returns the latest open (no endTime) irrigation event, optionally filtered by triggerType. */
-export async function getLatestOpenIrrigationEvent(triggerType?: string): Promise<IrrigationEvent | null> {
+/** Returns the latest open (no endTime) irrigation event. */
+export async function getLatestOpenIrrigationEvent(): Promise<IrrigationEvent | null> {
 	return prisma.irrigationEvent.findFirst({
-		where: { endTime: null, ...(triggerType ? { triggerType } : {}) },
+		where: { endTime: null },
 		orderBy: { startTime: 'desc' },
 	})
 }
