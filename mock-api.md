@@ -156,8 +156,7 @@ POST /api/zones
 Content-Type: application/json
 
 {
-  "name": "Front Garden",
-  "userId": "550e8400-e29b-41d4-a716-446655440000"
+  "name": "Front Garden"
 }
 ```
 
@@ -174,6 +173,10 @@ Content-Type: application/json
   "currentTemperature": 0
 }
 ```
+
+**Notes:**
+- `userId` is automatically set from the authenticated user (JWT token), not from request body
+- Only `name` is required in the request
 
 ---
 
@@ -247,6 +250,9 @@ Content-Type: application/json
   "profileId": "profile-001-uuid"
 }
 ```
+
+**Notes:**
+- `userId` cannot be changed via API — zone ownership is immutable
 
 **Response (200):**
 ```json
