@@ -1,6 +1,40 @@
-// GET /api/profiles/[profileId] - Get profile details
-// PUT /api/profiles/[profileId] - Update profile
-// DELETE /api/profiles/[profileId] - Delete profile (blocked if assigned to active zone)
-export async function GET() {}
-export async function PUT() {}
-export async function DELETE() {}
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { NextRequest, NextResponse } from 'next/server'
+import { getProfile, updateProfile, deleteProfile } from '@/services/profile-service'
+import { toJsonSafe } from '@/lib/utils'
+
+export async function GET(request: NextRequest, { params }: { params: Promise<{ profileId: string }> }) {
+	const { profileId } = await params
+	try {
+		const p = await getProfile(profileId)
+		if (!p) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+		return new NextResponse(JSON.stringify(toJsonSafe(p)), { headers: { 'Content-Type': 'application/json' } })
+	} catch (err) {
+		const message = err instanceof Error ? err.message : 'Unknown error'
+		return NextResponse.json({ error: message }, { status: 400 })
+	}
+}
+
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ profileId: string }> }) {
+	const { profileId } = await params
+	let body: any
+	try { body = await request.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
+	try {
+		const p = await updateProfile(profileId, body)
+		return new NextResponse(JSON.stringify(toJsonSafe(p)), { headers: { 'Content-Type': 'application/json' } })
+	} catch (err) {
+		const message = err instanceof Error ? err.message : 'Unknown error'
+		return NextResponse.json({ error: message }, { status: 400 })
+	}
+}
+
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ profileId: string }> }) {
+	const { profileId } = await params
+	try {
+		const p = await deleteProfile(profileId)
+		return new NextResponse(JSON.stringify(toJsonSafe(p)), { headers: { 'Content-Type': 'application/json' } })
+	} catch (err) {
+		const message = err instanceof Error ? err.message : 'Unknown error'
+		return NextResponse.json({ error: message }, { status: 400 })
+	}
+}
