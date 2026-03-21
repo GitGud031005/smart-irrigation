@@ -1,4 +1,4 @@
-// POST /api/sensors/sync — Poll all three Adafruit feeds since the last stored timestamp
+// POST /api/sensor-readings/sync — Poll all three Adafruit feeds since the last stored timestamp
 // and insert only new readings into the DB (deduplicates by recordedAt).
 
 import { NextResponse } from "next/server";

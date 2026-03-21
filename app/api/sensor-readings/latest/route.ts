@@ -1,4 +1,4 @@
-// GET /api/sensors/latest — Fetch the latest sensor readings from Adafruit IO and persist to DB
+// GET /api/sensor-readings/latest — Fetch the latest sensor readings from Adafruit IO and persist to DB
 
 import { NextResponse } from "next/server";
 import { getLatestSensorData } from "@/lib/adafruit-io";

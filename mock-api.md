@@ -295,124 +295,11 @@ DELETE /api/zones/zone-001-uuid
 
 ## Sensors
 
-Sensor fields: `id`, `sensorType`, `modelName`, `zoneId`
+The Sensor model has been removed. Sensors are now represented as **Devices**. Use `/api/devices` for device management.
 
-### 1. Create Sensor
+These endpoints remain for **Adafruit IO integration** only:
 
-**Request:**
-```http
-POST /api/sensors
-Content-Type: application/json
-
-{
-  "sensorType": "SOIL_MOISTURE",
-  "modelName": "DS18B20",
-  "zoneId": "zone-001-uuid"
-}
-```
-
-**Response (201):**
-```json
-{
-  "id": "sensor-001-uuid",
-  "sensorType": "SOIL_MOISTURE",
-  "modelName": "DS18B20",
-  "zoneId": "zone-001-uuid"
-}
-```
-
----
-
-### 2. List All Sensors
-
-**Request:**
-```http
-GET /api/sensors
-```
-
-**Response (200):**
-```json
-[
-  {
-    "id": "sensor-001-uuid",
-    "sensorType": "SOIL_MOISTURE",
-    "modelName": "DS18B20",
-    "zoneId": "zone-001-uuid"
-  },
-  {
-    "id": "sensor-002-uuid",
-    "sensorType": "TEMPERATURE",
-    "modelName": "DHT22",
-    "zoneId": "zone-001-uuid"
-  }
-]
-```
-
----
-
-### 3. Get Sensor Details
-
-**Request:**
-```http
-GET /api/sensors/sensor-001-uuid
-```
-
-**Response (200):**
-```json
-{
-  "id": "sensor-001-uuid",
-  "sensorType": "SOIL_MOISTURE",
-  "modelName": "DS18B20",
-  "zoneId": "zone-001-uuid"
-}
-```
-
----
-
-### 4. Update Sensor
-
-**Request:**
-```http
-PUT /api/sensors/sensor-001-uuid
-Content-Type: application/json
-
-{
-  "modelName": "DS18B20-Pro"
-}
-```
-
-**Response (200):**
-```json
-{
-  "id": "sensor-001-uuid",
-  "sensorType": "SOIL_MOISTURE",
-  "modelName": "DS18B20-Pro",
-  "zoneId": "zone-001-uuid"
-}
-```
-
----
-
-### 5. Delete Sensor
-
-**Request:**
-```http
-DELETE /api/sensors/sensor-001-uuid
-```
-
-**Response (200):**
-```json
-{
-  "id": "sensor-001-uuid",
-  "sensorType": "SOIL_MOISTURE",
-  "modelName": "DS18B20-Pro",
-  "zoneId": "zone-001-uuid"
-}
-```
-
----
-
-### 6. Get Latest Sensor Data (Adafruit to DB)
+### 1. Get Latest Sensor Data (Adafruit to DB)
 
 Fetches the current readings from all Adafruit IO feeds and persists them to the database.
 
@@ -450,7 +337,7 @@ GET /api/sensors/latest
 
 ---
 
-### 7. Sync Sensor Data from Adafruit
+### 2. Sync Sensor Data from Adafruit
 
 Batch-imports all new readings from all three Adafruit feeds since the last stored timestamp. Deduplicates by timestamp.
 
@@ -473,17 +360,24 @@ POST /api/sensors/sync
 
 ---
 
-### 8. Get Sensor Readings (per sensor)
+## Sensor Readings
+
+Cross-sensor reading management via `/api/sensor-readings`.
+
+SensorReading fields: `id`, `zoneId`, `soilMoisture`, `temperature`, `humidity`, `recordedAt`
+
+### 1. List Sensor Readings (with filters)
 
 **Request:**
 ```http
-GET /api/sensors/sensor-001-uuid/readings?since=2026-03-01T00:00:00Z&until=2026-03-20T00:00:00Z&take=100
+GET /api/sensor-readings?zoneId=zone-001-uuid&since=2026-03-01T00:00:00Z&until=2026-03-20T00:00:00Z&take=50
 ```
 
 **Query Parameters:**
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
+| `zoneId` | UUID | Filter by zone |
 | `since` | ISO date | Filter readings after this timestamp |
 | `until` | ISO date | Filter readings before this timestamp |
 | `take` | integer | Max number of results to return |
@@ -493,7 +387,7 @@ GET /api/sensors/sensor-001-uuid/readings?since=2026-03-01T00:00:00Z&until=2026-
 [
   {
     "id": "reading-001-uuid",
-    "sensorId": "sensor-001-uuid",
+    "zoneId": "zone-001-uuid",
     "soilMoisture": 45.2,
     "temperature": 22.5,
     "humidity": 65.0,
@@ -501,7 +395,7 @@ GET /api/sensors/sensor-001-uuid/readings?since=2026-03-01T00:00:00Z&until=2026-
   },
   {
     "id": "reading-002-uuid",
-    "sensorId": "sensor-001-uuid",
+    "zoneId": "zone-001-uuid",
     "soilMoisture": 43.8,
     "temperature": 22.1,
     "humidity": 64.5,
@@ -510,23 +404,17 @@ GET /api/sensors/sensor-001-uuid/readings?since=2026-03-01T00:00:00Z&until=2026-
 ]
 ```
 
-**Error Response (404):**
-```json
-{
-  "error": "Sensor not found"
-}
-```
-
 ---
 
-### 9. Create Sensor Reading (per sensor)
+### 2. Create Sensor Reading
 
 **Request:**
 ```http
-POST /api/sensors/sensor-001-uuid/readings
+POST /api/sensor-readings
 Content-Type: application/json
 
 {
+  "zoneId": "zone-001-uuid",
   "soilMoisture": 45.2,
   "temperature": 22.5,
   "humidity": 65.0,
@@ -538,7 +426,7 @@ Content-Type: application/json
 ```json
 {
   "id": "reading-001-uuid",
-  "sensorId": "sensor-001-uuid",
+  "zoneId": "zone-001-uuid",
   "soilMoisture": 45.2,
   "temperature": 22.5,
   "humidity": 65.0,
@@ -547,59 +435,13 @@ Content-Type: application/json
 ```
 
 **Notes:**
+- `zoneId` is optional — readings without a zone are used for raw Adafruit sync data
 - `recordedAt` is optional — defaults to current time
 - All measurement fields (`soilMoisture`, `temperature`, `humidity`) are individually optional
 
 ---
 
-## Sensor Readings
-
-Cross-sensor reading management via `/api/sensor-readings`.
-
-SensorReading fields: `id`, `sensorId`, `soilMoisture`, `temperature`, `humidity`, `recordedAt`
-
-### 1. List Sensor Readings (with filters)
-
-**Request:**
-```http
-GET /api/sensor-readings?sensorId=sensor-001-uuid&zoneId=zone-001-uuid&since=2026-03-01T00:00:00Z&until=2026-03-20T00:00:00Z&take=50
-```
-
-**Query Parameters:**
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `sensorId` | UUID | Filter by specific sensor |
-| `zoneId` | UUID | Filter by zone (all sensors in that zone) |
-| `since` | ISO date | Filter readings after this timestamp |
-| `until` | ISO date | Filter readings before this timestamp |
-| `take` | integer | Max number of results to return |
-
-**Response (200):**
-```json
-[
-  {
-    "id": "reading-001-uuid",
-    "sensorId": "sensor-001-uuid",
-    "soilMoisture": 45.2,
-    "temperature": 22.5,
-    "humidity": 65.0,
-    "recordedAt": "2026-03-20T10:30:00Z"
-  },
-  {
-    "id": "reading-002-uuid",
-    "sensorId": "sensor-002-uuid",
-    "soilMoisture": null,
-    "temperature": 21.8,
-    "humidity": 63.2,
-    "recordedAt": "2026-03-20T10:25:00Z"
-  }
-]
-```
-
----
-
-### 2. Get Sensor Reading
+### 3. Get Sensor Reading
 
 **Request:**
 ```http
@@ -610,7 +452,7 @@ GET /api/sensor-readings/reading-001-uuid
 ```json
 {
   "id": "reading-001-uuid",
-  "sensorId": "sensor-001-uuid",
+  "zoneId": "zone-001-uuid",
   "soilMoisture": 45.2,
   "temperature": 22.5,
   "humidity": 65.0,
@@ -627,7 +469,7 @@ GET /api/sensor-readings/reading-001-uuid
 
 ---
 
-### 3. Update Sensor Reading
+### 4. Update Sensor Reading
 
 **Request:**
 ```http
@@ -644,7 +486,7 @@ Content-Type: application/json
 ```json
 {
   "id": "reading-001-uuid",
-  "sensorId": "sensor-001-uuid",
+  "zoneId": "zone-001-uuid",
   "soilMoisture": 46.0,
   "temperature": 22.8,
   "humidity": 65.0,
@@ -654,7 +496,7 @@ Content-Type: application/json
 
 ---
 
-### 4. Delete Sensor Reading
+### 5. Delete Sensor Reading
 
 **Request:**
 ```http
@@ -665,7 +507,7 @@ DELETE /api/sensor-readings/reading-001-uuid
 ```json
 {
   "id": "reading-001-uuid",
-  "sensorId": "sensor-001-uuid",
+  "zoneId": "zone-001-uuid",
   "soilMoisture": 45.2,
   "temperature": 22.5,
   "humidity": 65.0,
@@ -904,7 +746,7 @@ Content-Type: application/json
 
 ## Profiles
 
-IrrigationProfile fields: `id`, `name`, `minMoisture`, `maxMoisture`, `wateringDuration`, `mode` (`AUTO` | `MANUAL` | `AI`)
+IrrigationProfile fields: `id`, `name`, `minMoisture`, `maxMoisture`, `mode` (`AUTO` | `MANUAL` | `AI`)
 
 ### 1. Create Profile
 
@@ -916,8 +758,7 @@ Content-Type: application/json
 {
   "name": "Summer Garden",
   "minMoisture": 30,
-  "maxMoisture": 70,
-  "wateringDuration": 1800
+  "maxMoisture": 70
 }
 ```
 
@@ -928,7 +769,6 @@ Content-Type: application/json
   "name": "Summer Garden",
   "minMoisture": 30,
   "maxMoisture": 70,
-  "wateringDuration": 1800,
   "mode": "AUTO"
 }
 ```
@@ -950,7 +790,6 @@ GET /api/profiles
     "name": "Summer Garden",
     "minMoisture": 30,
     "maxMoisture": 70,
-    "wateringDuration": 1800,
     "mode": "AUTO"
   }
 ]
@@ -972,7 +811,6 @@ GET /api/profiles/profile-001-uuid
   "name": "Summer Garden",
   "minMoisture": 30,
   "maxMoisture": 70,
-  "wateringDuration": 1800,
   "mode": "AUTO"
 }
 ```
@@ -999,7 +837,6 @@ Content-Type: application/json
   "name": "Summer Garden",
   "minMoisture": 35,
   "maxMoisture": 75,
-  "wateringDuration": 1800,
   "mode": "AUTO"
 }
 ```
@@ -1020,7 +857,6 @@ DELETE /api/profiles/profile-001-uuid
   "name": "Summer Garden",
   "minMoisture": 35,
   "maxMoisture": 75,
-  "wateringDuration": 1800,
   "mode": "AUTO"
 }
 ```
@@ -1425,7 +1261,7 @@ GET /api/export?format=json&startDate=2026-03-01&endDate=2026-03-31&zoneId=zone-
   "sensorReadings": [
     {
       "id": "reading-001-uuid",
-      "sensorId": "sensor-001-uuid",
+      "zoneId": "zone-001-uuid",
       "soilMoisture": 45.2,
       "temperature": 22.5,
       "humidity": 65.0,
@@ -1462,8 +1298,8 @@ GET /api/export?format=csv&startDate=2026-03-01&endDate=2026-03-31
 **Response (200):**
 ```csv
 SENSOR READINGS
-id,sensorId,soilMoisture,temperature,humidity,recordedAt
-reading-001-uuid,sensor-001-uuid,45.2,22.5,65.0,2026-03-20T10:30:00Z
+id,zoneId,soilMoisture,temperature,humidity,recordedAt
+reading-001-uuid,zone-001-uuid,45.2,22.5,65.0,2026-03-20T10:30:00Z
 
 IRRIGATION EVENTS
 id,zoneId,startTime,endTime,duration
@@ -1726,8 +1562,7 @@ Content-Type: application/json
 {
   "name": "Summer Garden",
   "minMoisture": 30,
-  "maxMoisture": 70,
-  "wateringDuration": 1800
+  "maxMoisture": 70
 }
 ```
 
