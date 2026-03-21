@@ -27,7 +27,6 @@ model IrrigationProfile {
   name            String?
   minMoisture     Float  @map("min_moisture")
   maxMoisture     Float  @map("max_moisture")
-  wateringDuration Int   @map("watering_duration")
   mode            IrrigationMode @default(AUTO) @map("mode")
 
   zones Zone[]
@@ -62,25 +61,12 @@ model Zone {
   currentHumidity   Float @default(0) @map("current_humidity")
   currentTemperature Float @default(0) @map("current_temperature")
 
-  sensors Sensor[]
   devices Device[]
+  sensorReadings SensorReading[]
   irrigationEvents IrrigationEvent[]
   alerts Alert[]
 
   @@map("ZONE")
-}
-
-model Sensor {
-  id         String @id @default(uuid()) @map("sensor_id")
-  sensorType String? @map("sensor_type")
-  modelName  String? @map("model")
-
-  zone   Zone? @relation(fields: [zoneId], references: [id])
-  zoneId String?
-
-  readings SensorReading[]
-
-  @@map("SENSOR")
 }
 
 model Device {
@@ -110,11 +96,14 @@ enum DeviceStatus {
 
 model SensorReading {
   id          String   @id @default(uuid()) @map("reading_id")
-  sensor      Sensor?  @relation(fields: [sensorId], references: [id])
-  sensorId    String?
+  
+  zone        Zone?    @relation(fields: [zoneId], references: [id])
+  zoneId      String?  @map("zone_id")
+  
   soilMoisture Float?  @map("soil_moisture")
   temperature  Float?
   humidity     Float?
+  
   recordedAt   DateTime @default(now()) @map("recorded_at")
 
   @@map("SENSOR_READING")
