@@ -62,6 +62,7 @@ model Zone {
   currentTemperature Float @default(0) @map("current_temperature")
 
   devices Device[]
+  sensorReadings SensorReading[]
   irrigationEvents IrrigationEvent[]
   alerts Alert[]
 
@@ -77,10 +78,6 @@ model Device {
 
   lastActiveAt DateTime? @map("last_active_at")
   status       DeviceStatus @default(ACTIVE) @map("status")
-
-  soilMoistureReadings SensorReading[] @relation("soilMoistureSensor")
-  temperatureReadings SensorReading[] @relation("temperatureSensor")
-  humidityReadings SensorReading[] @relation("humiditySensor")
 
   @@map("DEVICE")
 }
@@ -100,17 +97,12 @@ enum DeviceStatus {
 model SensorReading {
   id          String   @id @default(uuid()) @map("reading_id")
   
-  soilMoistureSensor   Device?  @relation("soilMoistureSensor", fields: [soilMoistureSensorId], references: [id])
-  soilMoistureSensorId String?  @map("soil_moisture_sensor_id")
-  soilMoisture         Float?   @map("soil_moisture")
+  zone        Zone?    @relation(fields: [zoneId], references: [id])
+  zoneId      String?  @map("zone_id")
   
-  temperatureSensor    Device?  @relation("temperatureSensor", fields: [temperatureSensorId], references: [id])
-  temperatureSensorId  String?  @map("temperature_sensor_id")
-  temperature          Float?
-  
-  humiditySensor       Device?  @relation("humiditySensor", fields: [humiditySensorId], references: [id])
-  humiditySensorId     String?  @map("humidity_sensor_id")
-  humidity             Float?
+  soilMoisture Float?  @map("soil_moisture")
+  temperature  Float?
+  humidity     Float?
   
   recordedAt   DateTime @default(now()) @map("recorded_at")
 
