@@ -27,7 +27,6 @@ model IrrigationProfile {
   name            String?
   minMoisture     Float  @map("min_moisture")
   maxMoisture     Float  @map("max_moisture")
-  wateringDuration Int   @map("watering_duration")
   mode            IrrigationMode @default(AUTO) @map("mode")
 
   zones Zone[]
@@ -62,25 +61,11 @@ model Zone {
   currentHumidity   Float @default(0) @map("current_humidity")
   currentTemperature Float @default(0) @map("current_temperature")
 
-  sensors Sensor[]
   devices Device[]
   irrigationEvents IrrigationEvent[]
   alerts Alert[]
 
   @@map("ZONE")
-}
-
-model Sensor {
-  id         String @id @default(uuid()) @map("sensor_id")
-  sensorType String? @map("sensor_type")
-  modelName  String? @map("model")
-
-  zone   Zone? @relation(fields: [zoneId], references: [id])
-  zoneId String?
-
-  readings SensorReading[]
-
-  @@map("SENSOR")
 }
 
 model Device {
@@ -92,6 +77,10 @@ model Device {
 
   lastActiveAt DateTime? @map("last_active_at")
   status       DeviceStatus @default(ACTIVE) @map("status")
+
+  soilMoistureReadings SensorReading[] @relation("soilMoistureSensor")
+  temperatureReadings SensorReading[] @relation("temperatureSensor")
+  humidityReadings SensorReading[] @relation("humiditySensor")
 
   @@map("DEVICE")
 }
@@ -110,11 +99,19 @@ enum DeviceStatus {
 
 model SensorReading {
   id          String   @id @default(uuid()) @map("reading_id")
-  sensor      Sensor?  @relation(fields: [sensorId], references: [id])
-  sensorId    String?
-  soilMoisture Float?  @map("soil_moisture")
-  temperature  Float?
-  humidity     Float?
+  
+  soilMoistureSensor   Device?  @relation("soilMoistureSensor", fields: [soilMoistureSensorId], references: [id])
+  soilMoistureSensorId String?  @map("soil_moisture_sensor_id")
+  soilMoisture         Float?   @map("soil_moisture")
+  
+  temperatureSensor    Device?  @relation("temperatureSensor", fields: [temperatureSensorId], references: [id])
+  temperatureSensorId  String?  @map("temperature_sensor_id")
+  temperature          Float?
+  
+  humiditySensor       Device?  @relation("humiditySensor", fields: [humiditySensorId], references: [id])
+  humiditySensorId     String?  @map("humidity_sensor_id")
+  humidity             Float?
+  
   recordedAt   DateTime @default(now()) @map("recorded_at")
 
   @@map("SENSOR_READING")
