@@ -35,13 +35,23 @@ export async function deleteSensorReading(id: string): Promise<SensorReading> {
 	return prisma.sensorReading.delete({ where: { id } })
 }
 
-/** Returns the recordedAt of the most recent reading where the given field is not null. */
-export async function getLatestReadingTimestamp(field: 'soilMoisture' | 'temperature' | 'humidity'): Promise<Date | null> {
-	const row = await prisma.sensorReading.findFirst({
-		where: { [field]: { not: null } },
-		orderBy: { recordedAt: 'desc' },
-		select: { recordedAt: true },
-	})
-	return row?.recordedAt ?? null
+export async function getLatestSensorReading(zoneId?: string): Promise<SensorReading | null> {
+  const lastReading = await prisma.sensorReading.findFirst({
+    where: zoneId ? { zoneId: zoneId } : undefined,
+    
+    orderBy: {
+      recordedAt: 'desc', 
+    },
+  });
+
+  return lastReading; 
+}
+
+export async function createSensorReadingsBatch(data: any[]) {
+  const result = await prisma.sensorReading.createMany({
+    data: data,
+    skipDuplicates: true,
+  });
+  return result.count;
 }
 
