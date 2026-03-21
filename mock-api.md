@@ -1,4 +1,4 @@
-# Smart Irrigation API Documentation
+﻿# Smart Irrigation API Documentation
 
 Complete API reference for the Smart Irrigation System with comprehensive examples for testing in Postman.
 
@@ -9,18 +9,20 @@ Complete API reference for the Smart Irrigation System with comprehensive exampl
 1. [Authentication](#authentication)
 2. [Zones](#zones)
 3. [Sensors](#sensors)
-4. [Devices](#devices)
-5. [Profiles](#profiles)
-6. [Schedules](#schedules)
-7. [Alerts](#alerts)
-8. [Irrigation Events](#irrigation-events)
-9. [Adafruit IO Integration](#adafruit-io-integration)
+4. [Sensor Readings](#sensor-readings)
+5. [Devices](#devices)
+6. [Profiles](#profiles)
+7. [Schedules](#schedules)
+8. [Alerts](#alerts)
+9. [Irrigation Events](#irrigation-events)
 10. [Data Export](#data-export)
 11. [Ordered Test Flow (Empty Database)](#ordered-test-flow-empty-database)
 
 ---
 
 ## Authentication
+
+All authenticated routes read a `session` cookie set automatically on login/register. No `Authorization` header is needed.
 
 ### 1. Register User
 
@@ -31,8 +33,7 @@ Content-Type: application/json
 
 {
   "email": "user@example.com",
-  "password": "SecurePass123!",
-  "name": "John Doe"
+  "password": "SecurePass123!"
 }
 ```
 
@@ -40,15 +41,12 @@ Content-Type: application/json
 ```json
 {
   "id": "550e8400-e29b-41d4-a716-446655440000",
-  "email": "user@example.com",
-  "name": "John Doe",
-  "createdAt": "2026-03-18T10:30:00Z"
+  "email": "user@example.com"
 }
 ```
 
 **Notes:**
-- User is automatically logged in after registration (Option A)
-- Session cookie is set automatically
+- Session cookie is set automatically on successful registration
 - Password must be at least 8 characters
 
 ---
@@ -70,14 +68,13 @@ Content-Type: application/json
 ```json
 {
   "id": "550e8400-e29b-41d4-a716-446655440000",
-  "email": "user@example.com",
-  "name": "John Doe"
+  "email": "user@example.com"
 }
 ```
 
 **Session Cookie Set:**
 ```
-Set-Cookie: session=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800; Secure
+Set-Cookie: session=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800
 ```
 
 **Error Response (401):**
@@ -105,12 +102,51 @@ POST /api/auth/logout
 
 **Session Cookie Cleared:**
 ```
-Set-Cookie: session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0; Secure
+Set-Cookie: session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0
 ```
 
 ---
 
+### 4. Change Password
+
+**Request:**
+```http
+PUT /api/auth/password
+Content-Type: application/json
+
+{
+  "currentPassword": "SecurePass123!",
+  "newPassword": "NewSecurePass456!"
+}
+```
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "user": {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "email": "user@example.com"
+  }
+}
+```
+
+**Error Response (401):**
+```json
+{
+  "error": "Unauthorized"
+}
+```
+
+**Notes:**
+- Requires valid session cookie
+- Both `currentPassword` and `newPassword` are required
+
+---
+
 ## Zones
+
+Zone fields: `id`, `name`, `userId`, `profileId`, `scheduleId`, `currentMoisture`, `currentHumidity`, `currentTemperature`
 
 ### 1. Create Zone
 
@@ -118,13 +154,9 @@ Set-Cookie: session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0; Secure
 ```http
 POST /api/zones
 Content-Type: application/json
-Authorization: Bearer <session-cookie>
 
 {
-  "name": "Front Garden",
-  "description": "Front lawn area",
-  "area": 50.5,
-  "location": "North side of house"
+  "name": "Front Garden"
 }
 ```
 
@@ -133,14 +165,18 @@ Authorization: Bearer <session-cookie>
 {
   "id": "zone-001-uuid",
   "name": "Front Garden",
-  "description": "Front lawn area",
-  "area": 50.5,
-  "location": "North side of house",
   "userId": "550e8400-e29b-41d4-a716-446655440000",
-  "createdAt": "2026-03-18T10:35:00Z",
-  "updatedAt": "2026-03-18T10:35:00Z"
+  "profileId": null,
+  "scheduleId": null,
+  "currentMoisture": 0,
+  "currentHumidity": 0,
+  "currentTemperature": 0
 }
 ```
+
+**Notes:**
+- `userId` is automatically set from the authenticated user (JWT token), not from request body
+- Only `name` is required in the request
 
 ---
 
@@ -149,7 +185,6 @@ Authorization: Bearer <session-cookie>
 **Request:**
 ```http
 GET /api/zones
-Authorization: Bearer <session-cookie>
 ```
 
 **Response (200):**
@@ -158,22 +193,22 @@ Authorization: Bearer <session-cookie>
   {
     "id": "zone-001-uuid",
     "name": "Front Garden",
-    "description": "Front lawn area",
-    "area": 50.5,
-    "location": "North side of house",
     "userId": "550e8400-e29b-41d4-a716-446655440000",
-    "createdAt": "2026-03-18T10:35:00Z",
-    "updatedAt": "2026-03-18T10:35:00Z"
+    "profileId": null,
+    "scheduleId": null,
+    "currentMoisture": 45.2,
+    "currentHumidity": 65.0,
+    "currentTemperature": 22.5
   },
   {
     "id": "zone-002-uuid",
     "name": "Back Patio",
-    "description": "Patio plants",
-    "area": 30.0,
-    "location": "South side",
     "userId": "550e8400-e29b-41d4-a716-446655440000",
-    "createdAt": "2026-03-18T10:36:00Z",
-    "updatedAt": "2026-03-18T10:36:00Z"
+    "profileId": null,
+    "scheduleId": null,
+    "currentMoisture": 38.0,
+    "currentHumidity": 60.0,
+    "currentTemperature": 23.1
   }
 ]
 ```
@@ -185,7 +220,6 @@ Authorization: Bearer <session-cookie>
 **Request:**
 ```http
 GET /api/zones/zone-001-uuid
-Authorization: Bearer <session-cookie>
 ```
 
 **Response (200):**
@@ -193,12 +227,12 @@ Authorization: Bearer <session-cookie>
 {
   "id": "zone-001-uuid",
   "name": "Front Garden",
-  "description": "Front lawn area",
-  "area": 50.5,
-  "location": "North side of house",
   "userId": "550e8400-e29b-41d4-a716-446655440000",
-  "createdAt": "2026-03-18T10:35:00Z",
-  "updatedAt": "2026-03-18T10:35:00Z"
+  "profileId": "profile-001-uuid",
+  "scheduleId": null,
+  "currentMoisture": 45.2,
+  "currentHumidity": 65.0,
+  "currentTemperature": 22.5
 }
 ```
 
@@ -210,25 +244,27 @@ Authorization: Bearer <session-cookie>
 ```http
 PUT /api/zones/zone-001-uuid
 Content-Type: application/json
-Authorization: Bearer <session-cookie>
 
 {
   "name": "Front Garden (Updated)",
-  "area": 55.5
+  "profileId": "profile-001-uuid"
 }
 ```
+
+**Notes:**
+- `userId` cannot be changed via API — zone ownership is immutable
 
 **Response (200):**
 ```json
 {
   "id": "zone-001-uuid",
   "name": "Front Garden (Updated)",
-  "description": "Front lawn area",
-  "area": 55.5,
-  "location": "North side of house",
   "userId": "550e8400-e29b-41d4-a716-446655440000",
-  "createdAt": "2026-03-18T10:35:00Z",
-  "updatedAt": "2026-03-18T10:40:00Z"
+  "profileId": "profile-001-uuid",
+  "scheduleId": null,
+  "currentMoisture": 45.2,
+  "currentHumidity": 65.0,
+  "currentTemperature": 22.5
 }
 ```
 
@@ -239,7 +275,6 @@ Authorization: Bearer <session-cookie>
 **Request:**
 ```http
 DELETE /api/zones/zone-001-uuid
-Authorization: Bearer <session-cookie>
 ```
 
 **Response (200):**
@@ -247,12 +282,12 @@ Authorization: Bearer <session-cookie>
 {
   "id": "zone-001-uuid",
   "name": "Front Garden (Updated)",
-  "description": "Front lawn area",
-  "area": 55.5,
-  "location": "North side of house",
   "userId": "550e8400-e29b-41d4-a716-446655440000",
-  "createdAt": "2026-03-18T10:35:00Z",
-  "updatedAt": "2026-03-18T10:40:00Z"
+  "profileId": "profile-001-uuid",
+  "scheduleId": null,
+  "currentMoisture": 45.2,
+  "currentHumidity": 65.0,
+  "currentTemperature": 22.5
 }
 ```
 
@@ -260,137 +295,223 @@ Authorization: Bearer <session-cookie>
 
 ## Sensors
 
-### 1. Create Sensor
+The Sensor model has been removed. Sensors are now represented as **Devices**. Use `/api/devices` for device management.
+
+These endpoints remain for **Adafruit IO integration** only:
+
+### 1. Get Latest Sensor Data (Adafruit to DB)
+
+Fetches the current readings from all Adafruit IO feeds and persists them to the database.
 
 **Request:**
 ```http
-POST /api/sensors
-Content-Type: application/json
-Authorization: Bearer <session-cookie>
+GET /api/sensors/latest
+```
 
+**Response (200):**
+```json
 {
-  "name": "Moisture Sensor 1",
-  "type": "SOIL_MOISTURE",
-  "zoneId": "zone-001-uuid",
-  "location": "Near main sprinkler"
+  "soilMoisture": {
+    "value": 45.2,
+    "created_at": "2026-03-20T10:30:00Z"
+  },
+  "temperature": {
+    "value": 22.5,
+    "created_at": "2026-03-20T10:30:00Z"
+  },
+  "humidity": {
+    "value": 65.0,
+    "created_at": "2026-03-20T10:30:00Z"
+  },
+  "savedReadingId": "reading-001-uuid",
+  "savedAt": "2026-03-20T10:30:05Z"
 }
 ```
 
-**Response (201):**
+**Error Response (502):**
 ```json
 {
-  "id": "sensor-001-uuid",
-  "name": "Moisture Sensor 1",
-  "type": "SOIL_MOISTURE",
-  "zoneId": "zone-001-uuid",
-  "location": "Near main sprinkler",
-  "userId": "550e8400-e29b-41d4-a716-446655440000",
-  "createdAt": "2026-03-18T10:45:00Z",
-  "updatedAt": "2026-03-18T10:45:00Z"
+  "error": "Failed to fetch from Adafruit IO"
 }
 ```
 
 ---
 
-### 2. List All Sensors
+### 2. Sync Sensor Data from Adafruit
+
+Batch-imports all new readings from all three Adafruit feeds since the last stored timestamp. Deduplicates by timestamp.
 
 **Request:**
 ```http
-GET /api/sensors
-Authorization: Bearer <session-cookie>
+POST /api/sensors/sync
 ```
+
+**Response (200):**
+```json
+{
+  "inserted": 12
+}
+```
+
+**Notes:**
+- `inserted` is the number of new readings written to the database
+- Already-stored readings are skipped (deduplication by `recordedAt` timestamp)
+- Reads from three feeds: soil-moisture, temperature, humidity
+
+---
+
+## Sensor Readings
+
+Cross-sensor reading management via `/api/sensor-readings`.
+
+SensorReading fields: `id`, `zoneId`, `soilMoisture`, `temperature`, `humidity`, `recordedAt`
+
+### 1. List Sensor Readings (with filters)
+
+**Request:**
+```http
+GET /api/sensor-readings?zoneId=zone-001-uuid&since=2026-03-01T00:00:00Z&until=2026-03-20T00:00:00Z&take=50
+```
+
+**Query Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `zoneId` | UUID | Filter by zone |
+| `since` | ISO date | Filter readings after this timestamp |
+| `until` | ISO date | Filter readings before this timestamp |
+| `take` | integer | Max number of results to return |
 
 **Response (200):**
 ```json
 [
   {
-    "id": "sensor-001-uuid",
-    "name": "Moisture Sensor 1",
-    "type": "SOIL_MOISTURE",
+    "id": "reading-001-uuid",
     "zoneId": "zone-001-uuid",
-    "location": "Near main sprinkler",
-    "userId": "550e8400-e29b-41d4-a716-446655440000",
-    "createdAt": "2026-03-18T10:45:00Z",
-    "updatedAt": "2026-03-18T10:45:00Z"
+    "soilMoisture": 45.2,
+    "temperature": 22.5,
+    "humidity": 65.0,
+    "recordedAt": "2026-03-20T10:30:00Z"
+  },
+  {
+    "id": "reading-002-uuid",
+    "zoneId": "zone-001-uuid",
+    "soilMoisture": 43.8,
+    "temperature": 22.1,
+    "humidity": 64.5,
+    "recordedAt": "2026-03-20T10:00:00Z"
   }
 ]
 ```
 
 ---
 
-### 3. Get Sensor Details
+### 2. Create Sensor Reading
 
 **Request:**
 ```http
-GET /api/sensors/sensor-001-uuid
-Authorization: Bearer <session-cookie>
-```
-
-**Response (200):**
-```json
-{
-  "id": "sensor-001-uuid",
-  "name": "Moisture Sensor 1",
-  "type": "SOIL_MOISTURE",
-  "zoneId": "zone-001-uuid",
-  "location": "Near main sprinkler",
-  "userId": "550e8400-e29b-41d4-a716-446655440000",
-  "createdAt": "2026-03-18T10:45:00Z",
-  "updatedAt": "2026-03-18T10:45:00Z"
-}
-```
-
----
-
-### 4. Update Sensor
-
-**Request:**
-```http
-PUT /api/sensors/sensor-001-uuid
+POST /api/sensor-readings
 Content-Type: application/json
-Authorization: Bearer <session-cookie>
 
 {
-  "name": "Moisture Sensor 1 (Updated)",
-  "location": "Garden center"
+  "zoneId": "zone-001-uuid",
+  "soilMoisture": 45.2,
+  "temperature": 22.5,
+  "humidity": 65.0,
+  "recordedAt": "2026-03-20T10:30:00Z"
 }
+```
+
+**Response (201):**
+```json
+{
+  "id": "reading-001-uuid",
+  "zoneId": "zone-001-uuid",
+  "soilMoisture": 45.2,
+  "temperature": 22.5,
+  "humidity": 65.0,
+  "recordedAt": "2026-03-20T10:30:00Z"
+}
+```
+
+**Notes:**
+- `zoneId` is optional — readings without a zone are used for raw Adafruit sync data
+- `recordedAt` is optional — defaults to current time
+- All measurement fields (`soilMoisture`, `temperature`, `humidity`) are individually optional
+
+---
+
+### 3. Get Sensor Reading
+
+**Request:**
+```http
+GET /api/sensor-readings/reading-001-uuid
 ```
 
 **Response (200):**
 ```json
 {
-  "id": "sensor-001-uuid",
-  "name": "Moisture Sensor 1 (Updated)",
-  "type": "SOIL_MOISTURE",
+  "id": "reading-001-uuid",
   "zoneId": "zone-001-uuid",
-  "location": "Garden center",
-  "userId": "550e8400-e29b-41d4-a716-446655440000",
-  "createdAt": "2026-03-18T10:45:00Z",
-  "updatedAt": "2026-03-18T10:50:00Z"
+  "soilMoisture": 45.2,
+  "temperature": 22.5,
+  "humidity": 65.0,
+  "recordedAt": "2026-03-20T10:30:00Z"
+}
+```
+
+**Error Response (404):**
+```json
+{
+  "error": "Not found"
 }
 ```
 
 ---
 
-### 5. Delete Sensor
+### 4. Update Sensor Reading
 
 **Request:**
 ```http
-DELETE /api/sensors/sensor-001-uuid
-Authorization: Bearer <session-cookie>
+PUT /api/sensor-readings/reading-001-uuid
+Content-Type: application/json
+
+{
+  "soilMoisture": 46.0,
+  "temperature": 22.8
+}
 ```
 
 **Response (200):**
 ```json
 {
-  "id": "sensor-001-uuid",
-  "name": "Moisture Sensor 1 (Updated)",
-  "type": "SOIL_MOISTURE",
+  "id": "reading-001-uuid",
   "zoneId": "zone-001-uuid",
-  "location": "Garden center",
-  "userId": "550e8400-e29b-41d4-a716-446655440000",
-  "createdAt": "2026-03-18T10:45:00Z",
-  "updatedAt": "2026-03-18T10:50:00Z"
+  "soilMoisture": 46.0,
+  "temperature": 22.8,
+  "humidity": 65.0,
+  "recordedAt": "2026-03-20T10:30:00Z"
+}
+```
+
+---
+
+### 5. Delete Sensor Reading
+
+**Request:**
+```http
+DELETE /api/sensor-readings/reading-001-uuid
+```
+
+**Response (200):**
+```json
+{
+  "id": "reading-001-uuid",
+  "zoneId": "zone-001-uuid",
+  "soilMoisture": 45.2,
+  "temperature": 22.5,
+  "humidity": 65.0,
+  "recordedAt": "2026-03-20T10:30:00Z"
 }
 ```
 
@@ -398,17 +519,17 @@ Authorization: Bearer <session-cookie>
 
 ## Devices
 
+Device fields: `id`, `deviceType`, `zoneId`, `status` (`ACTIVE` | `OFFLINE` | `ERROR`), `lastActiveAt`
+
 ### 1. Create Device
 
 **Request:**
 ```http
 POST /api/devices
 Content-Type: application/json
-Authorization: Bearer <session-cookie>
 
 {
-  "name": "Pump 1",
-  "type": "PUMP",
+  "deviceType": "PUMP",
   "zoneId": "zone-001-uuid"
 }
 ```
@@ -417,12 +538,10 @@ Authorization: Bearer <session-cookie>
 ```json
 {
   "id": "device-001-uuid",
-  "name": "Pump 1",
-  "type": "PUMP",
+  "deviceType": "PUMP",
   "zoneId": "zone-001-uuid",
-  "userId": "550e8400-e29b-41d4-a716-446655440000",
-  "createdAt": "2026-03-18T10:55:00Z",
-  "updatedAt": "2026-03-18T10:55:00Z"
+  "status": "ACTIVE",
+  "lastActiveAt": null
 }
 ```
 
@@ -433,7 +552,6 @@ Authorization: Bearer <session-cookie>
 **Request:**
 ```http
 GET /api/devices
-Authorization: Bearer <session-cookie>
 ```
 
 **Response (200):**
@@ -441,12 +559,17 @@ Authorization: Bearer <session-cookie>
 [
   {
     "id": "device-001-uuid",
-    "name": "Pump 1",
-    "type": "PUMP",
+    "deviceType": "PUMP",
     "zoneId": "zone-001-uuid",
-    "userId": "550e8400-e29b-41d4-a716-446655440000",
-    "createdAt": "2026-03-18T10:55:00Z",
-    "updatedAt": "2026-03-18T10:55:00Z"
+    "status": "ACTIVE",
+    "lastActiveAt": null
+  },
+  {
+    "id": "device-002-uuid",
+    "deviceType": "SPRINKLER",
+    "zoneId": "zone-002-uuid",
+    "status": "OFFLINE",
+    "lastActiveAt": "2026-03-20T09:00:00Z"
   }
 ]
 ```
@@ -458,19 +581,16 @@ Authorization: Bearer <session-cookie>
 **Request:**
 ```http
 GET /api/devices/device-001-uuid
-Authorization: Bearer <session-cookie>
 ```
 
 **Response (200):**
 ```json
 {
   "id": "device-001-uuid",
-  "name": "Pump 1",
-  "type": "PUMP",
+  "deviceType": "PUMP",
   "zoneId": "zone-001-uuid",
-  "userId": "550e8400-e29b-41d4-a716-446655440000",
-  "createdAt": "2026-03-18T10:55:00Z",
-  "updatedAt": "2026-03-18T10:55:00Z"
+  "status": "ACTIVE",
+  "lastActiveAt": null
 }
 ```
 
@@ -482,10 +602,10 @@ Authorization: Bearer <session-cookie>
 ```http
 PUT /api/devices/device-001-uuid
 Content-Type: application/json
-Authorization: Bearer <session-cookie>
 
 {
-  "name": "Pump 1 (Main)"
+  "deviceType": "PUMP",
+  "status": "OFFLINE"
 }
 ```
 
@@ -493,12 +613,10 @@ Authorization: Bearer <session-cookie>
 ```json
 {
   "id": "device-001-uuid",
-  "name": "Pump 1 (Main)",
-  "type": "PUMP",
+  "deviceType": "PUMP",
   "zoneId": "zone-001-uuid",
-  "userId": "550e8400-e29b-41d4-a716-446655440000",
-  "createdAt": "2026-03-18T10:55:00Z",
-  "updatedAt": "2026-03-18T11:00:00Z"
+  "status": "OFFLINE",
+  "lastActiveAt": null
 }
 ```
 
@@ -509,25 +627,126 @@ Authorization: Bearer <session-cookie>
 **Request:**
 ```http
 DELETE /api/devices/device-001-uuid
-Authorization: Bearer <session-cookie>
 ```
 
 **Response (200):**
 ```json
 {
   "id": "device-001-uuid",
-  "name": "Pump 1 (Main)",
-  "type": "PUMP",
+  "deviceType": "PUMP",
   "zoneId": "zone-001-uuid",
-  "userId": "550e8400-e29b-41d4-a716-446655440000",
-  "createdAt": "2026-03-18T10:55:00Z",
-  "updatedAt": "2026-03-18T11:00:00Z"
+  "status": "OFFLINE",
+  "lastActiveAt": "2026-03-20T10:00:00Z"
 }
 ```
 
 ---
 
+### 6. Control Device (Pump)
+
+Controls a pump device: sends a command to Adafruit IO, updates the device status in the database, and opens or closes an irrigation event automatically.
+
+**Request:**
+```http
+POST /api/devices/device-001-uuid/control
+Content-Type: application/json
+
+{
+  "action": "1"
+}
+```
+
+**Body:**
+
+| Field | Value | Description |
+|-------|-------|-------------|
+| `action` | `"1"` | Turn pump **ON** — sets `status: ACTIVE`, opens new IrrigationEvent |
+| `action` | `"0"` | Turn pump **OFF** — sets `status: OFFLINE`, closes the latest open IrrigationEvent |
+
+**Response (200) — Turn ON:**
+```json
+{
+  "success": true,
+  "pump": "1",
+  "device": {
+    "id": "device-001-uuid",
+    "deviceType": "PUMP",
+    "zoneId": "zone-001-uuid",
+    "status": "ACTIVE",
+    "lastActiveAt": "2026-03-20T10:30:00Z"
+  },
+  "event": {
+    "id": "event-001-uuid",
+    "zoneId": "zone-001-uuid",
+    "startTime": "2026-03-20T10:30:00Z",
+    "endTime": null,
+    "duration": null
+  },
+  "adafruitResponse": {
+    "id": "456791",
+    "value": "1",
+    "created_at": "2026-03-20T10:30:00Z"
+  }
+}
+```
+
+**Response (200) — Turn OFF:**
+```json
+{
+  "success": true,
+  "pump": "0",
+  "device": {
+    "id": "device-001-uuid",
+    "deviceType": "PUMP",
+    "zoneId": "zone-001-uuid",
+    "status": "OFFLINE",
+    "lastActiveAt": "2026-03-20T10:45:00Z"
+  },
+  "event": {
+    "id": "event-001-uuid",
+    "zoneId": "zone-001-uuid",
+    "startTime": "2026-03-20T10:30:00Z",
+    "endTime": "2026-03-20T10:45:00Z",
+    "duration": 900
+  },
+  "adafruitResponse": {
+    "id": "456792",
+    "value": "0",
+    "created_at": "2026-03-20T10:45:00Z"
+  }
+}
+```
+
+**Error Response (404):**
+```json
+{
+  "error": "Device not found"
+}
+```
+
+**Error Response (400):**
+```json
+{
+  "error": "action must be '1' (on) or '0' (off)"
+}
+```
+
+**Error Response (502):**
+```json
+{
+  "error": "Failed to reach Adafruit IO"
+}
+```
+
+**Notes:**
+- `duration` is calculated in **seconds** when the event is closed
+- If no open irrigation event exists when turning OFF, `event` will be `null`
+
+---
+
 ## Profiles
+
+IrrigationProfile fields: `id`, `name`, `minMoisture`, `maxMoisture`, `mode` (`AUTO` | `MANUAL` | `AI`)
 
 ### 1. Create Profile
 
@@ -535,14 +754,11 @@ Authorization: Bearer <session-cookie>
 ```http
 POST /api/profiles
 Content-Type: application/json
-Authorization: Bearer <session-cookie>
 
 {
   "name": "Summer Garden",
-  "description": "Profile for summer watering",
   "minMoisture": 30,
-  "maxMoisture": 70,
-  "temperatureThreshold": 25
+  "maxMoisture": 70
 }
 ```
 
@@ -551,13 +767,9 @@ Authorization: Bearer <session-cookie>
 {
   "id": "profile-001-uuid",
   "name": "Summer Garden",
-  "description": "Profile for summer watering",
   "minMoisture": 30,
   "maxMoisture": 70,
-  "temperatureThreshold": 25,
-  "userId": "550e8400-e29b-41d4-a716-446655440000",
-  "createdAt": "2026-03-18T11:05:00Z",
-  "updatedAt": "2026-03-18T11:05:00Z"
+  "mode": "AUTO"
 }
 ```
 
@@ -568,7 +780,6 @@ Authorization: Bearer <session-cookie>
 **Request:**
 ```http
 GET /api/profiles
-Authorization: Bearer <session-cookie>
 ```
 
 **Response (200):**
@@ -577,13 +788,9 @@ Authorization: Bearer <session-cookie>
   {
     "id": "profile-001-uuid",
     "name": "Summer Garden",
-    "description": "Profile for summer watering",
     "minMoisture": 30,
     "maxMoisture": 70,
-    "temperatureThreshold": 25,
-    "userId": "550e8400-e29b-41d4-a716-446655440000",
-    "createdAt": "2026-03-18T11:05:00Z",
-    "updatedAt": "2026-03-18T11:05:00Z"
+    "mode": "AUTO"
   }
 ]
 ```
@@ -595,7 +802,6 @@ Authorization: Bearer <session-cookie>
 **Request:**
 ```http
 GET /api/profiles/profile-001-uuid
-Authorization: Bearer <session-cookie>
 ```
 
 **Response (200):**
@@ -603,13 +809,9 @@ Authorization: Bearer <session-cookie>
 {
   "id": "profile-001-uuid",
   "name": "Summer Garden",
-  "description": "Profile for summer watering",
   "minMoisture": 30,
   "maxMoisture": 70,
-  "temperatureThreshold": 25,
-  "userId": "550e8400-e29b-41d4-a716-446655440000",
-  "createdAt": "2026-03-18T11:05:00Z",
-  "updatedAt": "2026-03-18T11:05:00Z"
+  "mode": "AUTO"
 }
 ```
 
@@ -621,7 +823,6 @@ Authorization: Bearer <session-cookie>
 ```http
 PUT /api/profiles/profile-001-uuid
 Content-Type: application/json
-Authorization: Bearer <session-cookie>
 
 {
   "minMoisture": 35,
@@ -634,13 +835,9 @@ Authorization: Bearer <session-cookie>
 {
   "id": "profile-001-uuid",
   "name": "Summer Garden",
-  "description": "Profile for summer watering",
   "minMoisture": 35,
   "maxMoisture": 75,
-  "temperatureThreshold": 25,
-  "userId": "550e8400-e29b-41d4-a716-446655440000",
-  "createdAt": "2026-03-18T11:05:00Z",
-  "updatedAt": "2026-03-18T11:10:00Z"
+  "mode": "AUTO"
 }
 ```
 
@@ -651,7 +848,6 @@ Authorization: Bearer <session-cookie>
 **Request:**
 ```http
 DELETE /api/profiles/profile-001-uuid
-Authorization: Bearer <session-cookie>
 ```
 
 **Response (200):**
@@ -659,13 +855,16 @@ Authorization: Bearer <session-cookie>
 {
   "id": "profile-001-uuid",
   "name": "Summer Garden",
-  "description": "Profile for summer watering",
   "minMoisture": 35,
   "maxMoisture": 75,
-  "temperatureThreshold": 25,
-  "userId": "550e8400-e29b-41d4-a716-446655440000",
-  "createdAt": "2026-03-18T11:05:00Z",
-  "updatedAt": "2026-03-18T11:10:00Z"
+  "mode": "AUTO"
+}
+```
+
+**Error Response (400):**
+```json
+{
+  "error": "Profile is assigned to one or more zones"
 }
 ```
 
@@ -673,22 +872,17 @@ Authorization: Bearer <session-cookie>
 
 ## Schedules
 
+Schedule fields: `id`, `cronExpression`, `isActive`
+
 ### 1. Create Schedule
 
 **Request:**
 ```http
 POST /api/schedules
 Content-Type: application/json
-Authorization: Bearer <session-cookie>
 
 {
-  "name": "Morning Watering",
-  "description": "Daily morning irrigation",
-  "zoneId": "zone-001-uuid",
-  "profileId": "profile-001-uuid",
-  "startTime": "06:00",
-  "endTime": "08:00",
-  "daysOfWeek": ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"],
+  "cronExpression": "0 6 * * 1-5",
   "isActive": true
 }
 ```
@@ -697,19 +891,14 @@ Authorization: Bearer <session-cookie>
 ```json
 {
   "id": "schedule-001-uuid",
-  "name": "Morning Watering",
-  "description": "Daily morning irrigation",
-  "zoneId": "zone-001-uuid",
-  "profileId": "profile-001-uuid",
-  "startTime": "06:00",
-  "endTime": "08:00",
-  "daysOfWeek": ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"],
-  "isActive": true,
-  "userId": "550e8400-e29b-41d4-a716-446655440000",
-  "createdAt": "2026-03-18T11:15:00Z",
-  "updatedAt": "2026-03-18T11:15:00Z"
+  "cronExpression": "0 6 * * 1-5",
+  "isActive": true
 }
 ```
+
+**Notes:**
+- `cronExpression` uses standard cron syntax (minute hour day month weekday)
+- Example: `"0 6 * * 1-5"` = every weekday at 06:00
 
 ---
 
@@ -718,7 +907,6 @@ Authorization: Bearer <session-cookie>
 **Request:**
 ```http
 GET /api/schedules
-Authorization: Bearer <session-cookie>
 ```
 
 **Response (200):**
@@ -726,17 +914,13 @@ Authorization: Bearer <session-cookie>
 [
   {
     "id": "schedule-001-uuid",
-    "name": "Morning Watering",
-    "description": "Daily morning irrigation",
-    "zoneId": "zone-001-uuid",
-    "profileId": "profile-001-uuid",
-    "startTime": "06:00",
-    "endTime": "08:00",
-    "daysOfWeek": ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"],
-    "isActive": true,
-    "userId": "550e8400-e29b-41d4-a716-446655440000",
-    "createdAt": "2026-03-18T11:15:00Z",
-    "updatedAt": "2026-03-18T11:15:00Z"
+    "cronExpression": "0 6 * * 1-5",
+    "isActive": true
+  },
+  {
+    "id": "schedule-002-uuid",
+    "cronExpression": "0 18 * * 6,0",
+    "isActive": true
   }
 ]
 ```
@@ -748,24 +932,14 @@ Authorization: Bearer <session-cookie>
 **Request:**
 ```http
 GET /api/schedules/schedule-001-uuid
-Authorization: Bearer <session-cookie>
 ```
 
 **Response (200):**
 ```json
 {
   "id": "schedule-001-uuid",
-  "name": "Morning Watering",
-  "description": "Daily morning irrigation",
-  "zoneId": "zone-001-uuid",
-  "profileId": "profile-001-uuid",
-  "startTime": "06:00",
-  "endTime": "08:00",
-  "daysOfWeek": ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"],
-  "isActive": true,
-  "userId": "550e8400-e29b-41d4-a716-446655440000",
-  "createdAt": "2026-03-18T11:15:00Z",
-  "updatedAt": "2026-03-18T11:15:00Z"
+  "cronExpression": "0 6 * * 1-5",
+  "isActive": true
 }
 ```
 
@@ -777,10 +951,9 @@ Authorization: Bearer <session-cookie>
 ```http
 PUT /api/schedules/schedule-001-uuid
 Content-Type: application/json
-Authorization: Bearer <session-cookie>
 
 {
-  "startTime": "05:30",
+  "cronExpression": "30 5 * * 1-5",
   "isActive": false
 }
 ```
@@ -789,17 +962,8 @@ Authorization: Bearer <session-cookie>
 ```json
 {
   "id": "schedule-001-uuid",
-  "name": "Morning Watering",
-  "description": "Daily morning irrigation",
-  "zoneId": "zone-001-uuid",
-  "profileId": "profile-001-uuid",
-  "startTime": "05:30",
-  "endTime": "08:00",
-  "daysOfWeek": ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"],
-  "isActive": false,
-  "userId": "550e8400-e29b-41d4-a716-446655440000",
-  "createdAt": "2026-03-18T11:15:00Z",
-  "updatedAt": "2026-03-18T11:20:00Z"
+  "cronExpression": "30 5 * * 1-5",
+  "isActive": false
 }
 ```
 
@@ -810,24 +974,21 @@ Authorization: Bearer <session-cookie>
 **Request:**
 ```http
 DELETE /api/schedules/schedule-001-uuid
-Authorization: Bearer <session-cookie>
 ```
 
 **Response (200):**
 ```json
 {
   "id": "schedule-001-uuid",
-  "name": "Morning Watering",
-  "description": "Daily morning irrigation",
-  "zoneId": "zone-001-uuid",
-  "profileId": "profile-001-uuid",
-  "startTime": "05:30",
-  "endTime": "08:00",
-  "daysOfWeek": ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"],
-  "isActive": false,
-  "userId": "550e8400-e29b-41d4-a716-446655440000",
-  "createdAt": "2026-03-18T11:15:00Z",
-  "updatedAt": "2026-03-18T11:20:00Z"
+  "cronExpression": "30 5 * * 1-5",
+  "isActive": false
+}
+```
+
+**Error Response (400):**
+```json
+{
+  "error": "Schedule is assigned to a zone"
 }
 ```
 
@@ -835,17 +996,17 @@ Authorization: Bearer <session-cookie>
 
 ## Alerts
 
+Alert fields: `id`, `zoneId`, `message`, `createdAt`
+
 ### 1. Create Alert
 
 **Request:**
 ```http
 POST /api/alerts
 Content-Type: application/json
-Authorization: Bearer <session-cookie>
 
 {
   "message": "Soil moisture critically low",
-  "severity": "HIGH",
   "zoneId": "zone-001-uuid"
 }
 ```
@@ -854,13 +1015,9 @@ Authorization: Bearer <session-cookie>
 ```json
 {
   "id": "alert-001-uuid",
-  "message": "Soil moisture critically low",
-  "severity": "HIGH",
   "zoneId": "zone-001-uuid",
-  "userId": "550e8400-e29b-41d4-a716-446655440000",
-  "isRead": false,
-  "createdAt": "2026-03-18T11:25:00Z",
-  "updatedAt": "2026-03-18T11:25:00Z"
+  "message": "Soil moisture critically low",
+  "createdAt": "2026-03-20T11:25:00Z"
 }
 ```
 
@@ -871,7 +1028,6 @@ Authorization: Bearer <session-cookie>
 **Request:**
 ```http
 GET /api/alerts
-Authorization: Bearer <session-cookie>
 ```
 
 **Response (200):**
@@ -879,13 +1035,9 @@ Authorization: Bearer <session-cookie>
 [
   {
     "id": "alert-001-uuid",
-    "message": "Soil moisture critically low",
-    "severity": "HIGH",
     "zoneId": "zone-001-uuid",
-    "userId": "550e8400-e29b-41d4-a716-446655440000",
-    "isRead": false,
-    "createdAt": "2026-03-18T11:25:00Z",
-    "updatedAt": "2026-03-18T11:25:00Z"
+    "message": "Soil moisture critically low",
+    "createdAt": "2026-03-20T11:25:00Z"
   }
 ]
 ```
@@ -897,21 +1049,23 @@ Authorization: Bearer <session-cookie>
 **Request:**
 ```http
 GET /api/alerts?zoneId=zone-001-uuid&take=10
-Authorization: Bearer <session-cookie>
 ```
+
+**Query Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `zoneId` | UUID | Filter by zone |
+| `take` | integer | Max results to return |
 
 **Response (200):**
 ```json
 [
   {
     "id": "alert-001-uuid",
-    "message": "Soil moisture critically low",
-    "severity": "HIGH",
     "zoneId": "zone-001-uuid",
-    "userId": "550e8400-e29b-41d4-a716-446655440000",
-    "isRead": false,
-    "createdAt": "2026-03-18T11:25:00Z",
-    "updatedAt": "2026-03-18T11:25:00Z"
+    "message": "Soil moisture critically low",
+    "createdAt": "2026-03-20T11:25:00Z"
   }
 ]
 ```
@@ -923,20 +1077,15 @@ Authorization: Bearer <session-cookie>
 **Request:**
 ```http
 GET /api/alerts/alert-001-uuid
-Authorization: Bearer <session-cookie>
 ```
 
 **Response (200):**
 ```json
 {
   "id": "alert-001-uuid",
-  "message": "Soil moisture critically low",
-  "severity": "HIGH",
   "zoneId": "zone-001-uuid",
-  "userId": "550e8400-e29b-41d4-a716-446655440000",
-  "isRead": false,
-  "createdAt": "2026-03-18T11:25:00Z",
-  "updatedAt": "2026-03-18T11:25:00Z"
+  "message": "Soil moisture critically low",
+  "createdAt": "2026-03-20T11:25:00Z"
 }
 ```
 
@@ -947,20 +1096,15 @@ Authorization: Bearer <session-cookie>
 **Request:**
 ```http
 DELETE /api/alerts/alert-001-uuid
-Authorization: Bearer <session-cookie>
 ```
 
 **Response (200):**
 ```json
 {
   "id": "alert-001-uuid",
-  "message": "Soil moisture critically low",
-  "severity": "HIGH",
   "zoneId": "zone-001-uuid",
-  "userId": "550e8400-e29b-41d4-a716-446655440000",
-  "isRead": false,
-  "createdAt": "2026-03-18T11:25:00Z",
-  "updatedAt": "2026-03-18T11:25:00Z"
+  "message": "Soil moisture critically low",
+  "createdAt": "2026-03-20T11:25:00Z"
 }
 ```
 
@@ -968,21 +1112,20 @@ Authorization: Bearer <session-cookie>
 
 ## Irrigation Events
 
+IrrigationEvent fields: `id`, `zoneId`, `startTime`, `endTime`, `duration`
+
+Events are automatically created/closed by `POST /api/devices/[deviceId]/control`. These endpoints allow manual management.
+
 ### 1. Create Irrigation Event
 
 **Request:**
 ```http
 POST /api/irrigation-events
 Content-Type: application/json
-Authorization: Bearer <session-cookie>
 
 {
   "zoneId": "zone-001-uuid",
-  "deviceId": "device-001-uuid",
-  "startTime": "2026-03-18T06:00:00Z",
-  "endTime": "2026-03-18T06:30:00Z",
-  "waterUsed": 150.5,
-  "type": "SCHEDULED"
+  "startTime": "2026-03-20T06:00:00Z"
 }
 ```
 
@@ -991,26 +1134,29 @@ Authorization: Bearer <session-cookie>
 {
   "id": "event-001-uuid",
   "zoneId": "zone-001-uuid",
-  "deviceId": "device-001-uuid",
-  "startTime": "2026-03-18T06:00:00Z",
-  "endTime": "2026-03-18T06:30:00Z",
-  "waterUsed": 150.5,
-  "type": "SCHEDULED",
-  "userId": "550e8400-e29b-41d4-a716-446655440000",
-  "createdAt": "2026-03-18T11:30:00Z",
-  "updatedAt": "2026-03-18T11:30:00Z"
+  "startTime": "2026-03-20T06:00:00Z",
+  "endTime": null,
+  "duration": null
 }
 ```
 
 ---
 
-### 2. List All Irrigation Events
+### 2. List Irrigation Events
 
 **Request:**
 ```http
-GET /api/irrigation-events
-Authorization: Bearer <session-cookie>
+GET /api/irrigation-events?zoneId=zone-001-uuid&since=2026-03-01T00:00:00Z&until=2026-03-31T00:00:00Z&take=20
 ```
+
+**Query Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `zoneId` | UUID | Filter by zone |
+| `since` | ISO date | Filter events starting after this time |
+| `until` | ISO date | Filter events starting before this time |
+| `take` | integer | Max results (ordered by `startTime` desc) |
 
 **Response (200):**
 ```json
@@ -1018,14 +1164,16 @@ Authorization: Bearer <session-cookie>
   {
     "id": "event-001-uuid",
     "zoneId": "zone-001-uuid",
-    "deviceId": "device-001-uuid",
-    "startTime": "2026-03-18T06:00:00Z",
-    "endTime": "2026-03-18T06:30:00Z",
-    "waterUsed": 150.5,
-    "type": "SCHEDULED",
-    "userId": "550e8400-e29b-41d4-a716-446655440000",
-    "createdAt": "2026-03-18T11:30:00Z",
-    "updatedAt": "2026-03-18T11:30:00Z"
+    "startTime": "2026-03-20T06:00:00Z",
+    "endTime": "2026-03-20T06:30:00Z",
+    "duration": 1800
+  },
+  {
+    "id": "event-002-uuid",
+    "zoneId": "zone-001-uuid",
+    "startTime": "2026-03-19T06:00:00Z",
+    "endTime": "2026-03-19T06:25:00Z",
+    "duration": 1500
   }
 ]
 ```
@@ -1037,7 +1185,6 @@ Authorization: Bearer <session-cookie>
 **Request:**
 ```http
 GET /api/irrigation-events/event-001-uuid
-Authorization: Bearer <session-cookie>
 ```
 
 **Response (200):**
@@ -1045,14 +1192,9 @@ Authorization: Bearer <session-cookie>
 {
   "id": "event-001-uuid",
   "zoneId": "zone-001-uuid",
-  "deviceId": "device-001-uuid",
-  "startTime": "2026-03-18T06:00:00Z",
-  "endTime": "2026-03-18T06:30:00Z",
-  "waterUsed": 150.5,
-  "type": "SCHEDULED",
-  "userId": "550e8400-e29b-41d4-a716-446655440000",
-  "createdAt": "2026-03-18T11:30:00Z",
-  "updatedAt": "2026-03-18T11:30:00Z"
+  "startTime": "2026-03-20T06:00:00Z",
+  "endTime": "2026-03-20T06:30:00Z",
+  "duration": 1800
 }
 ```
 
@@ -1064,10 +1206,10 @@ Authorization: Bearer <session-cookie>
 ```http
 PUT /api/irrigation-events/event-001-uuid
 Content-Type: application/json
-Authorization: Bearer <session-cookie>
 
 {
-  "waterUsed": 160.0
+  "endTime": "2026-03-20T06:35:00Z",
+  "duration": 2100
 }
 ```
 
@@ -1076,14 +1218,9 @@ Authorization: Bearer <session-cookie>
 {
   "id": "event-001-uuid",
   "zoneId": "zone-001-uuid",
-  "deviceId": "device-001-uuid",
-  "startTime": "2026-03-18T06:00:00Z",
-  "endTime": "2026-03-18T06:30:00Z",
-  "waterUsed": 160.0,
-  "type": "SCHEDULED",
-  "userId": "550e8400-e29b-41d4-a716-446655440000",
-  "createdAt": "2026-03-18T11:30:00Z",
-  "updatedAt": "2026-03-18T11:35:00Z"
+  "startTime": "2026-03-20T06:00:00Z",
+  "endTime": "2026-03-20T06:35:00Z",
+  "duration": 2100
 }
 ```
 
@@ -1094,7 +1231,6 @@ Authorization: Bearer <session-cookie>
 **Request:**
 ```http
 DELETE /api/irrigation-events/event-001-uuid
-Authorization: Bearer <session-cookie>
 ```
 
 **Response (200):**
@@ -1102,133 +1238,11 @@ Authorization: Bearer <session-cookie>
 {
   "id": "event-001-uuid",
   "zoneId": "zone-001-uuid",
-  "deviceId": "device-001-uuid",
-  "startTime": "2026-03-18T06:00:00Z",
-  "endTime": "2026-03-18T06:30:00Z",
-  "waterUsed": 160.0,
-  "type": "SCHEDULED",
-  "userId": "550e8400-e29b-41d4-a716-446655440000",
-  "createdAt": "2026-03-18T11:30:00Z",
-  "updatedAt": "2026-03-18T11:35:00Z"
+  "startTime": "2026-03-20T06:00:00Z",
+  "endTime": "2026-03-20T06:35:00Z",
+  "duration": 2100
 }
 ```
-
----
-
-## Adafruit IO Integration
-
-### 1. Get Adafruit Feeds
-
-**Request:**
-```http
-GET /api/adafruit/feeds
-Authorization: Bearer <session-cookie>
-```
-
-**Response (200):**
-```json
-{
-  "feeds": [
-    {
-      "id": "123456",
-      "name": "smart-irrigation.sensor-readings",
-      "key": "sensor-readings",
-      "created_at": "2026-01-15T10:00:00Z",
-      "updated_at": "2026-03-18T11:40:00Z"
-    },
-    {
-      "id": "123457",
-      "name": "smart-irrigation.irrigation-control",
-      "key": "irrigation-control",
-      "created_at": "2026-01-15T10:05:00Z",
-      "updated_at": "2026-03-18T11:40:00Z"
-    }
-  ]
-}
-```
-
----
-
-### 2. Get Adafruit Feed Data
-
-**Request:**
-```http
-GET /api/adafruit/data?feed=temperature
-Authorization: Bearer <session-cookie>
-```
-
-**Response (200):**
-```json
-{
-  "data": [
-    {
-      "id": "456789",
-      "value": "65.5",
-      "created_at": "2026-03-18T11:35:00Z"
-    },
-    {
-      "id": "456788",
-      "value": "64.2",
-      "created_at": "2026-03-18T11:30:00Z"
-    },
-    {
-      "id": "456787",
-      "value": "62.8",
-      "created_at": "2026-03-18T11:25:00Z"
-    }
-  ]
-}
-```
-
----
-
-### 3. Send Data to Adafruit Feed
-
-**Request:**
-```http
-POST /api/adafruit/data
-Content-Type: application/json
-Authorization: Bearer <session-cookie>
-
-{
-  "value": "68.3"
-}
-```
-
-**Response (201):**
-```json
-{
-  "id": "456790",
-  "value": "68.3",
-  "created_at": "2026-03-18T11:45:00Z"
-}
-```
-
----
-
-### 4. Control Pump via Adafruit Feed
-
-**Request:**
-```http
-POST /api/adafruit/pump
-Content-Type: application/json
-Authorization: Bearer <session-cookie>
-
-{
-  "value": "1"
-}
-```
-
-**Response (201):**
-```json
-{
-  "id": "456791",
-  "value": "1",
-  "created_at": "2026-03-18T11:46:00Z"
-}
-```
-
-**Note:** Value `1` turns pump ON, `0` turns pump OFF
 
 ---
 
@@ -1239,7 +1253,6 @@ Authorization: Bearer <session-cookie>
 **Request:**
 ```http
 GET /api/export?format=json&startDate=2026-03-01&endDate=2026-03-31&zoneId=zone-001-uuid
-Authorization: Bearer <session-cookie>
 ```
 
 **Response (200):**
@@ -1247,21 +1260,21 @@ Authorization: Bearer <session-cookie>
 {
   "sensorReadings": [
     {
-      "id": "reading-001",
-      "sensorId": "sensor-001-uuid",
-      "value": 65.5,
-      "timestamp": "2026-03-18T11:35:00Z"
+      "id": "reading-001-uuid",
+      "zoneId": "zone-001-uuid",
+      "soilMoisture": 45.2,
+      "temperature": 22.5,
+      "humidity": 65.0,
+      "recordedAt": "2026-03-20T10:30:00Z"
     }
   ],
   "irrigationEvents": [
     {
       "id": "event-001-uuid",
       "zoneId": "zone-001-uuid",
-      "deviceId": "device-001-uuid",
-      "startTime": "2026-03-18T06:00:00Z",
-      "endTime": "2026-03-18T06:30:00Z",
-      "waterUsed": 150.5,
-      "type": "SCHEDULED"
+      "startTime": "2026-03-20T06:00:00Z",
+      "endTime": "2026-03-20T06:30:00Z",
+      "duration": 1800
     }
   ]
 }
@@ -1270,7 +1283,7 @@ Authorization: Bearer <session-cookie>
 **Response Headers:**
 ```
 Content-Type: application/json
-Content-Disposition: attachment; filename="export-2026-03-18.json"
+Content-Disposition: attachment; filename="export-2026-03-20.json"
 ```
 
 ---
@@ -1280,48 +1293,39 @@ Content-Disposition: attachment; filename="export-2026-03-18.json"
 **Request:**
 ```http
 GET /api/export?format=csv&startDate=2026-03-01&endDate=2026-03-31
-Authorization: Bearer <session-cookie>
 ```
 
 **Response (200):**
 ```csv
 SENSOR READINGS
-id,sensorId,value,timestamp
-reading-001,sensor-001-uuid,65.5,2026-03-18T11:35:00Z
+id,zoneId,soilMoisture,temperature,humidity,recordedAt
+reading-001-uuid,zone-001-uuid,45.2,22.5,65.0,2026-03-20T10:30:00Z
 
 IRRIGATION EVENTS
-id,zoneId,deviceId,startTime,endTime,waterUsed,type
-event-001-uuid,zone-001-uuid,device-001-uuid,2026-03-18T06:00:00Z,2026-03-18T06:30:00Z,150.5,SCHEDULED
+id,zoneId,startTime,endTime,duration
+event-001-uuid,zone-001-uuid,2026-03-20T06:00:00Z,2026-03-20T06:30:00Z,1800
 ```
 
 **Response Headers:**
 ```
 Content-Type: text/csv; charset=utf-8
-Content-Disposition: attachment; filename="export-2026-03-18.csv"
+Content-Disposition: attachment; filename="export-2026-03-20.csv"
 ```
 
 ---
 
-### 3. Export with Sensor Filter
+### 3. Export with Zone Filter
 
 **Request:**
 ```http
-GET /api/export?format=json&sensorId=sensor-001-uuid
-Authorization: Bearer <session-cookie>
+GET /api/export?format=json&zoneId=zone-001-uuid
 ```
 
 **Response (200):**
 ```json
 {
-  "sensorReadings": [
-    {
-      "id": "reading-001",
-      "sensorId": "sensor-001-uuid",
-      "value": 65.5,
-      "timestamp": "2026-03-18T11:35:00Z"
-    }
-  ],
-  "irrigationEvents": []
+  "sensorReadings": [...],
+  "irrigationEvents": [...]
 }
 ```
 
@@ -1329,7 +1333,7 @@ Authorization: Bearer <session-cookie>
 
 ## Ordered Test Flow (Empty Database)
 
-This is a step-by-step guide to test all API endpoints starting from an empty database. Save all resource IDs as you go.
+Step-by-step guide to test all API endpoints starting from an empty database. Save all resource IDs as variables as you go.
 
 ### Step 1: Register User
 
@@ -1339,12 +1343,11 @@ Content-Type: application/json
 
 {
   "email": "testuser@example.com",
-  "password": "TestPassword123!",
-  "name": "Test User"
+  "password": "TestPassword123!"
 }
 ```
 
-**✅ Save:** User ID = `{USER_ID}`
+**Save:** `USER_ID` from response `id`
 
 ---
 
@@ -1360,7 +1363,7 @@ Content-Type: application/json
 }
 ```
 
-**✅ Note:** Session cookie auto-set. Use for all subsequent requests.
+**Note:** Session cookie auto-set. All subsequent requests use it automatically.
 
 ---
 
@@ -1369,17 +1372,14 @@ Content-Type: application/json
 ```http
 POST /api/zones
 Content-Type: application/json
-Authorization: Bearer <session-cookie>
 
 {
   "name": "Front Garden",
-  "description": "Front lawn area",
-  "area": 50.5,
-  "location": "North side"
+  "userId": "{USER_ID}"
 }
 ```
 
-**✅ Save:** Zone1 ID = `{ZONE_1_ID}`
+**Save:** `ZONE_1_ID`
 
 ---
 
@@ -1388,17 +1388,14 @@ Authorization: Bearer <session-cookie>
 ```http
 POST /api/zones
 Content-Type: application/json
-Authorization: Bearer <session-cookie>
 
 {
   "name": "Back Patio",
-  "description": "Patio plants",
-  "area": 30.0,
-  "location": "South side"
+  "userId": "{USER_ID}"
 }
 ```
 
-**✅ Save:** Zone2 ID = `{ZONE_2_ID}`
+**Save:** `ZONE_2_ID`
 
 ---
 
@@ -1406,7 +1403,6 @@ Authorization: Bearer <session-cookie>
 
 ```http
 GET /api/zones
-Authorization: Bearer <session-cookie>
 ```
 
 **Expected:** 2 zones returned
@@ -1418,17 +1414,15 @@ Authorization: Bearer <session-cookie>
 ```http
 POST /api/sensors
 Content-Type: application/json
-Authorization: Bearer <session-cookie>
 
 {
-  "name": "Moisture Sensor 1",
-  "type": "SOIL_MOISTURE",
-  "zoneId": "{ZONE_1_ID}",
-  "location": "Near main sprinkler"
+  "sensorType": "SOIL_MOISTURE",
+  "modelName": "DS18B20",
+  "zoneId": "{ZONE_1_ID}"
 }
 ```
 
-**✅ Save:** Sensor1 ID = `{SENSOR_1_ID}`
+**Save:** `SENSOR_1_ID`
 
 ---
 
@@ -1437,498 +1431,328 @@ Authorization: Bearer <session-cookie>
 ```http
 POST /api/sensors
 Content-Type: application/json
-Authorization: Bearer <session-cookie>
 
 {
-  "name": "Temperature Sensor 1",
-  "type": "TEMPERATURE",
-  "zoneId": "{ZONE_1_ID}",
-  "location": "Center of zone"
-}
-```
-
-**✅ Save:** Sensor2 ID = `{SENSOR_2_ID}`
-
----
-
-### Step 8: Create Sensor 3 (Zone 2)
-
-```http
-POST /api/sensors
-Content-Type: application/json
-Authorization: Bearer <session-cookie>
-
-{
-  "name": "Moisture Sensor 2",
-  "type": "SOIL_MOISTURE",
-  "zoneId": "{ZONE_2_ID}",
-  "location": "Patio center"
-}
-```
-
-**✅ Save:** Sensor3 ID = `{SENSOR_3_ID}`
-
----
-
-### Step 9: Get Sensor Details
-
-```http
-GET /api/sensors/{SENSOR_1_ID}
-Authorization: Bearer <session-cookie>
-```
-
-**Expected:** Details for Sensor 1
-
----
-
-### Step 10: Create Device 1 (Pump)
-
-```http
-POST /api/devices
-Content-Type: application/json
-Authorization: Bearer <session-cookie>
-
-{
-  "name": "Main Pump",
-  "type": "PUMP",
+  "sensorType": "TEMPERATURE",
+  "modelName": "DHT22",
   "zoneId": "{ZONE_1_ID}"
 }
 ```
 
-**✅ Save:** Device1 ID = `{DEVICE_1_ID}`
+**Save:** `SENSOR_2_ID`
 
 ---
 
-### Step 11: Create Device 2 (Sprinkler)
+### Step 8: Create Device 1 (Pump)
 
 ```http
 POST /api/devices
 Content-Type: application/json
-Authorization: Bearer <session-cookie>
 
 {
-  "name": "Sprinkler Head 1",
-  "type": "SPRINKLER",
-  "zoneId": "{ZONE_2_ID}"
+  "deviceType": "PUMP",
+  "zoneId": "{ZONE_1_ID}"
 }
 ```
 
-**✅ Save:** Device2 ID = `{DEVICE_2_ID}`
+**Save:** `DEVICE_1_ID`
 
 ---
 
-### Step 12: List All Devices
+### Step 9: List All Devices
 
 ```http
 GET /api/devices
-Authorization: Bearer <session-cookie>
 ```
 
-**Expected:** 2 devices returned
+**Expected:** 1 device with `status: "ACTIVE"` and `lastActiveAt: null`
 
 ---
 
-### Step 13: Create Profile 1 (Summer)
+### Step 10: Get Latest Sensor Data from Adafruit
+
+```http
+GET /api/sensors/latest
+```
+
+**Expected:** soilMoisture, temperature, humidity from Adafruit IO + new DB reading persisted.
+
+**Save:** `READING_ID` from response `savedReadingId`
+
+---
+
+### Step 11: Sync Historical Data from Adafruit
+
+```http
+POST /api/sensors/sync
+```
+
+**Expected:** `{ "inserted": N }` — readings bulk-imported since last stored timestamp.
+
+---
+
+### Step 12: List Sensor Readings (per sensor)
+
+```http
+GET /api/sensors/{SENSOR_1_ID}/readings?take=10
+```
+
+**Expected:** Up to 10 readings for Sensor 1
+
+---
+
+### Step 13: Create Manual Sensor Reading
+
+```http
+POST /api/sensors/{SENSOR_1_ID}/readings
+Content-Type: application/json
+
+{
+  "soilMoisture": 45.2,
+  "temperature": 22.5,
+  "humidity": 65.0
+}
+```
+
+**Save:** `READING_1_ID`
+
+---
+
+### Step 14: List All Sensor Readings (cross-sensor)
+
+```http
+GET /api/sensor-readings?zoneId={ZONE_1_ID}&take=20
+```
+
+**Expected:** Readings from all sensors in Zone 1
+
+---
+
+### Step 15: Get Single Sensor Reading
+
+```http
+GET /api/sensor-readings/{READING_1_ID}
+```
+
+**Expected:** The reading created in Step 13
+
+---
+
+### Step 16: Update Sensor Reading
+
+```http
+PUT /api/sensor-readings/{READING_1_ID}
+Content-Type: application/json
+
+{
+  "soilMoisture": 46.0
+}
+```
+
+**Expected:** Updated reading with `soilMoisture: 46.0`
+
+---
+
+### Step 17: Create Profile 1
 
 ```http
 POST /api/profiles
 Content-Type: application/json
-Authorization: Bearer <session-cookie>
 
 {
   "name": "Summer Garden",
-  "description": "Summer watering profile",
   "minMoisture": 30,
-  "maxMoisture": 70,
-  "temperatureThreshold": 25
+  "maxMoisture": 70
 }
 ```
 
-**✅ Save:** Profile1 ID = `{PROFILE_1_ID}`
+**Save:** `PROFILE_1_ID`
 
 ---
 
-### Step 14: Create Profile 2 (Winter)
-
-```http
-POST /api/profiles
-Content-Type: application/json
-Authorization: Bearer <session-cookie>
-
-{
-  "name": "Winter Garden",
-  "description": "Winter watering profile",
-  "minMoisture": 50,
-  "maxMoisture": 80,
-  "temperatureThreshold": 5
-}
-```
-
-**✅ Save:** Profile2 ID = `{PROFILE_2_ID}`
-
----
-
-### Step 15: Update Profile 1
-
-```http
-PUT /api/profiles/{PROFILE_1_ID}
-Content-Type: application/json
-Authorization: Bearer <session-cookie>
-
-{
-  "minMoisture": 35,
-  "maxMoisture": 75
-}
-```
-
-**Expected:** Profile1 updated with new moisture values
-
----
-
-### Step 16: Create Schedule 1 (Morning)
+### Step 18: Create Schedule 1
 
 ```http
 POST /api/schedules
 Content-Type: application/json
-Authorization: Bearer <session-cookie>
 
 {
-  "name": "Morning Watering",
-  "description": "Daily morning irrigation",
-  "zoneId": "{ZONE_1_ID}",
+  "cronExpression": "0 6 * * 1-5",
+  "isActive": true
+}
+```
+
+**Save:** `SCHEDULE_1_ID`
+
+---
+
+### Step 19: Assign Profile and Schedule to Zone
+
+```http
+PUT /api/zones/{ZONE_1_ID}
+Content-Type: application/json
+
+{
   "profileId": "{PROFILE_1_ID}",
-  "startTime": "06:00",
-  "endTime": "08:00",
-  "daysOfWeek": ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"],
-  "isActive": true
+  "scheduleId": "{SCHEDULE_1_ID}"
 }
 ```
 
-**✅ Save:** Schedule1 ID = `{SCHEDULE_1_ID}`
+**Expected:** Zone 1 updated with profile and schedule linked
 
 ---
 
-### Step 17: Create Schedule 2 (Evening)
+### Step 20: Turn Pump ON (Device Control)
 
 ```http
-POST /api/schedules
+POST /api/devices/{DEVICE_1_ID}/control
 Content-Type: application/json
-Authorization: Bearer <session-cookie>
 
 {
-  "name": "Evening Watering",
-  "description": "Daily evening irrigation",
-  "zoneId": "{ZONE_2_ID}",
-  "profileId": "{PROFILE_2_ID}",
-  "startTime": "18:00",
-  "endTime": "20:00",
-  "daysOfWeek": ["SATURDAY", "SUNDAY"],
-  "isActive": true
+  "action": "1"
 }
 ```
 
-**✅ Save:** Schedule2 ID = `{SCHEDULE_2_ID}`
+**Expected:**
+- `pump: "1"`
+- `device.status: "ACTIVE"`, `device.lastActiveAt` set to now
+- New IrrigationEvent opened (`endTime: null`)
+
+**Save:** `EVENT_1_ID` from response `event.id`
 
 ---
 
-### Step 18: List All Schedules
+### Step 21: List Irrigation Events
 
 ```http
-GET /api/schedules
-Authorization: Bearer <session-cookie>
+GET /api/irrigation-events?zoneId={ZONE_1_ID}
 ```
 
-**Expected:** 2 schedules returned
+**Expected:** 1 open event with `endTime: null`
 
 ---
 
-### Step 19: Update Schedule 1
+### Step 22: Turn Pump OFF (Device Control)
 
 ```http
-PUT /api/schedules/{SCHEDULE_1_ID}
+POST /api/devices/{DEVICE_1_ID}/control
 Content-Type: application/json
-Authorization: Bearer <session-cookie>
 
 {
-  "startTime": "05:30",
-  "isActive": false
+  "action": "0"
 }
 ```
 
-**Expected:** Schedule1 updated
+**Expected:**
+- `pump: "0"`
+- `device.status: "OFFLINE"`, `device.lastActiveAt` updated
+- IrrigationEvent closed with `endTime` and `duration` (in seconds) set
 
 ---
 
-### Step 20: Create Irrigation Event 1
-
-```http
-POST /api/irrigation-events
-Content-Type: application/json
-Authorization: Bearer <session-cookie>
-
-{
-  "zoneId": "{ZONE_1_ID}",
-  "deviceId": "{DEVICE_1_ID}",
-  "startTime": "2026-03-18T06:00:00Z",
-  "endTime": "2026-03-18T06:30:00Z",
-  "waterUsed": 150.5,
-  "type": "SCHEDULED"
-}
-```
-
-**✅ Save:** Event1 ID = `{EVENT_1_ID}`
-
----
-
-### Step 21: Create Irrigation Event 2
-
-```http
-POST /api/irrigation-events
-Content-Type: application/json
-Authorization: Bearer <session-cookie>
-
-{
-  "zoneId": "{ZONE_2_ID}",
-  "deviceId": "{DEVICE_2_ID}",
-  "startTime": "2026-03-18T18:00:00Z",
-  "endTime": "2026-03-18T18:45:00Z",
-  "waterUsed": 120.0,
-  "type": "SCHEDULED"
-}
-```
-
-**✅ Save:** Event2 ID = `{EVENT_2_ID}`
-
----
-
-### Step 22: Get Irrigation Event Details
+### Step 23: Verify Closed Irrigation Event
 
 ```http
 GET /api/irrigation-events/{EVENT_1_ID}
-Authorization: Bearer <session-cookie>
 ```
 
-**Expected:** Details for Event 1
+**Expected:** Event with `endTime` and `duration` populated
 
 ---
 
-### Step 23: Update Irrigation Event 1
-
-```http
-PUT /api/irrigation-events/{EVENT_1_ID}
-Content-Type: application/json
-Authorization: Bearer <session-cookie>
-
-{
-  "waterUsed": 160.0
-}
-```
-
-**Expected:** Event1 water usage updated
-
----
-
-### Step 24: List All Irrigation Events
-
-```http
-GET /api/irrigation-events
-Authorization: Bearer <session-cookie>
-```
-
-**Expected:** 2 events returned
-
----
-
-### Step 25: Create Alert 1
+### Step 24: Create Alert
 
 ```http
 POST /api/alerts
 Content-Type: application/json
-Authorization: Bearer <session-cookie>
 
 {
   "message": "Soil moisture critically low in Front Garden",
-  "severity": "HIGH",
   "zoneId": "{ZONE_1_ID}"
 }
 ```
 
-**✅ Save:** Alert1 ID = `{ALERT_1_ID}`
+**Save:** `ALERT_1_ID`
 
 ---
 
-### Step 26: Create Alert 2
+### Step 25: List Alerts by Zone
 
 ```http
-POST /api/alerts
+GET /api/alerts?zoneId={ZONE_1_ID}
+```
+
+**Expected:** 1 alert for Zone 1
+
+---
+
+### Step 26: Change Password
+
+```http
+PUT /api/auth/password
 Content-Type: application/json
-Authorization: Bearer <session-cookie>
 
 {
-  "message": "Temperature above threshold in Back Patio",
-  "severity": "MEDIUM",
-  "zoneId": "{ZONE_2_ID}"
+  "currentPassword": "TestPassword123!",
+  "newPassword": "UpdatedPassword456!"
 }
 ```
 
-**✅ Save:** Alert2 ID = `{ALERT_2_ID}`
+**Expected:** `{ "success": true, "user": { "id": "...", "email": "..." } }`
 
 ---
 
-### Step 27: List All Alerts
+### Step 27: Export Data as JSON
 
 ```http
-GET /api/alerts
-Authorization: Bearer <session-cookie>
+GET /api/export?format=json&zoneId={ZONE_1_ID}
 ```
 
-**Expected:** 2 alerts returned
+**Expected:** JSON download with sensor readings and irrigation events for Zone 1
 
 ---
 
-### Step 28: List Alerts by Zone Filter
-
-```http
-GET /api/alerts?zoneId={ZONE_1_ID}&take=10
-Authorization: Bearer <session-cookie>
-```
-
-**Expected:** 1 alert (Alert1 only)
-
----
-
-### Step 29: Get Alert Details
-
-```http
-GET /api/alerts/{ALERT_1_ID}
-Authorization: Bearer <session-cookie>
-```
-
-**Expected:** Details for Alert 1
-
----
-
-### Step 30: Get Adafruit Feeds
-
-```http
-GET /api/adafruit/feeds
-Authorization: Bearer <session-cookie>
-```
-
-**Expected:** List of available Adafruit IO feeds
-
----
-
-### Step 31: Get Sensor Feed Data
-
-```http
-GET /api/adafruit/feeds/sensor-readings/data
-Authorization: Bearer <session-cookie>
-```
-
-**Expected:** Recent sensor readings from Adafruit IO
-
----
-
-### Step 32: Send Sensor Reading to Adafruit
-
-```http
-POST /api/adafruit/feeds/sensor-readings/data
-Content-Type: application/json
-Authorization: Bearer <session-cookie>
-
-{
-  "value": "68.5"
-}
-```
-
-**Expected:** Data sent to Adafruit IO feed
-
----
-
-### Step 33: Control Pump via Adafruit (Turn ON)
-
-```http
-POST /api/adafruit/feeds/irrigation-control/data
-Content-Type: application/json
-Authorization: Bearer <session-cookie>
-
-{
-  "value": "1"
-}
-```
-
-**Expected:** Pump control command sent (value 1 = ON)
-
----
-
-### Step 34: Export As JSON (Full)
-
-```http
-GET /api/export?format=json
-Authorization: Bearer <session-cookie>
-```
-
-**Expected:** JSON file download with all sensor readings and irrigation events
-
----
-
-### Step 35: Export As CSV (Full)
+### Step 28: Export Data as CSV
 
 ```http
 GET /api/export?format=csv
-Authorization: Bearer <session-cookie>
 ```
 
-**Expected:** CSV file download with two sections (readings + events)
+**Expected:** CSV file download with all data
 
 ---
 
-### Step 36: Export With Date Range Filter
+### Step 29: Delete Sensor Reading
 
 ```http
-GET /api/export?format=json&startDate=2026-03-01&endDate=2026-03-31
-Authorization: Bearer <session-cookie>
+DELETE /api/sensor-readings/{READING_1_ID}
 ```
 
-**Expected:** JSON export filtered to March 2026 data
+**Expected:** Deleted reading returned
 
 ---
 
-### Step 37: Export With Zone Filter
+### Step 30: Delete Alert
 
 ```http
-GET /api/export?format=csv&zoneId={ZONE_1_ID}
-Authorization: Bearer <session-cookie>
+DELETE /api/alerts/{ALERT_1_ID}
 ```
 
-**Expected:** CSV export containing only Zone 1 data
+**Expected:** Alert deleted
 
 ---
 
-### Step 38: Delete Alert 2
+### Step 31: Delete Irrigation Event
 
 ```http
-DELETE /api/alerts/{ALERT_2_ID}
-Authorization: Bearer <session-cookie>
+DELETE /api/irrigation-events/{EVENT_1_ID}
 ```
 
-**Expected:** Alert2 deleted
+**Expected:** Event deleted
 
 ---
 
-### Step 39: Delete Irrigation Event 2
-
-```http
-DELETE /api/irrigation-events/{EVENT_2_ID}
-Authorization: Bearer <session-cookie>
-```
-
-**Expected:** Event2 deleted
-
----
-
-### Step 40: Logout User
+### Step 32: Logout User
 
 ```http
 POST /api/auth/logout
@@ -1940,12 +1764,36 @@ POST /api/auth/logout
 
 ## Summary
 
-- **Total API Endpoints:** 48+ examples
-- **Test Flow Steps:** 40 ordered steps from empty database
-- **Resource Types:** 8 (Users, Zones, Sensors, Devices, Profiles, Schedules, Alerts, Irrigation Events)
-- **Integration:** Adafruit IO feeds and data control
-- **Export Formats:** JSON and CSV with filtering
-- **Authentication:** JWT-based with session cookies
+| Endpoint | Method(s) | Description |
+|----------|-----------|-------------|
+| `/api/auth/register` | POST | Register user |
+| `/api/auth/login` | POST | Login |
+| `/api/auth/logout` | POST | Logout |
+| `/api/auth/password` | PUT | Change password |
+| `/api/zones` | GET, POST | List / Create zones |
+| `/api/zones/[id]` | GET, PUT, DELETE | Get / Update / Delete zone |
+| `/api/sensors` | GET, POST | List / Create sensors |
+| `/api/sensors/[id]` | GET, PUT, DELETE | Get / Update / Delete sensor |
+| `/api/sensors/latest` | GET | Fetch latest from Adafruit IO + persist to DB |
+| `/api/sensors/sync` | POST | Batch sync all feeds from Adafruit IO |
+| `/api/sensors/[id]/readings` | GET, POST | Per-sensor reading list / create |
+| `/api/sensor-readings` | GET | Cross-sensor readings with filters |
+| `/api/sensor-readings/[id]` | GET, PUT, DELETE | Get / Update / Delete reading |
+| `/api/devices` | GET, POST | List / Create devices |
+| `/api/devices/[id]` | GET, PUT, DELETE | Get / Update / Delete device |
+| `/api/devices/[id]/control` | POST | Pump control (Adafruit + DB + IrrigationEvent) |
+| `/api/profiles` | GET, POST | List / Create profiles |
+| `/api/profiles/[id]` | GET, PUT, DELETE | Get / Update / Delete profile |
+| `/api/schedules` | GET, POST | List / Create schedules |
+| `/api/schedules/[id]` | GET, PUT, DELETE | Get / Update / Delete schedule |
+| `/api/alerts` | GET, POST | List / Create alerts |
+| `/api/alerts/[id]` | GET, DELETE | Get / Delete alert |
+| `/api/irrigation-events` | GET, POST | List / Create events |
+| `/api/irrigation-events/[id]` | GET, PUT, DELETE | Get / Update / Delete event |
+| `/api/export` | GET | Export JSON or CSV |
 
-All endpoints require authentication except `/api/auth/register` and `/api/auth/login`.
+**Total Routes:** 35+ endpoints across 11 resource types
 
+**Authentication:** JWT session cookie (set automatically on login/register). All endpoints require the session cookie except `/api/auth/register` and `/api/auth/login`.
+
+**Adafruit IO:** Used internally by `GET /api/sensors/latest`, `POST /api/sensors/sync`, and `POST /api/devices/[id]/control`. Not directly exposed to clients.

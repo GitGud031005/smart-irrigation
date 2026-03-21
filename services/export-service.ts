@@ -6,12 +6,10 @@ interface ExportOptions {
 	startDate?: string
 	endDate?: string
 	zoneId?: string
-	sensorId?: string
 }
 
 async function fetchData(opts: ExportOptions) {
 	const where: Record<string, unknown> = {}
-	if (opts.sensorId) where.sensorId = opts.sensorId
 	if (opts.zoneId) where.zoneId = opts.zoneId
 	if (opts.startDate || opts.endDate) {
 		const range: Record<string, Date> = {}
@@ -39,11 +37,11 @@ export async function exportDataCSV(opts: ExportOptions): Promise<string> {
 	const lines: string[] = []
 
 	lines.push('=== Sensor Readings ===')
-	lines.push('id,sensorId,soilMoisture,temperature,humidity,recordedAt')
+	lines.push('id,zoneId,soilMoisture,temperature,humidity,recordedAt')
 	for (const r of readings) {
 		lines.push([
 			r.id,
-			r.sensorId ?? '',
+			r.zoneId ?? '',
 			r.soilMoisture ?? '',
 			r.temperature ?? '',
 			r.humidity ?? '',

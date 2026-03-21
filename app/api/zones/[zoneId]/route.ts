@@ -20,7 +20,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 	let body: any
 	try { body = await request.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
 	try {
-		const zone = await updateZone(zoneId, body)
+		// Strip userId from body — zone ownership cannot be changed via API
+		// eslint-disable-next-line @typescript-eslint/no-unused-vars
+		const { userId: _ignored, ...rest } = body
+		const zone = await updateZone(zoneId, rest)
 		return new NextResponse(JSON.stringify(toJsonSafe(zone)), { headers: { 'Content-Type': 'application/json' } })
 	} catch (err) {
 		const message = err instanceof Error ? err.message : 'Unknown error'

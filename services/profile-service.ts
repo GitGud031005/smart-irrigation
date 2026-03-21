@@ -1,7 +1,7 @@
 import prisma from '../lib/prisma'
-import type { IrrigationProfile } from '../lib/generated/prisma/client'
+import type { IrrigationProfile, IrrigationMode } from '../lib/generated/prisma/client'
 
-export async function createProfile(data: { name?: string; minMoisture: number; maxMoisture: number; wateringDuration: number }): Promise<IrrigationProfile> {
+export async function createProfile(data: { name?: string; minMoisture: number; maxMoisture: number; mode?: IrrigationMode }): Promise<IrrigationProfile> {
 	return prisma.irrigationProfile.create({ data })
 }
 
@@ -13,7 +13,7 @@ export async function listProfiles(): Promise<IrrigationProfile[]> {
 	return prisma.irrigationProfile.findMany()
 }
 
-export async function updateProfile(id: string, data: Partial<{ name: string; minMoisture: number; maxMoisture: number; wateringDuration: number }>): Promise<IrrigationProfile> {
+export async function updateProfile(id: string, data: Partial<{ name: string; minMoisture: number; maxMoisture: number; mode: IrrigationMode }>): Promise<IrrigationProfile> {
 	return prisma.irrigationProfile.update({ where: { id }, data })
 }
 
