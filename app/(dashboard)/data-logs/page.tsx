@@ -50,6 +50,15 @@ function formatTimestamp(iso: string): string {
     });
 }
 
+function getVisiblePages(current: number, total: number): (number | string)[] {
+    if (total <= 5) return Array.from({ length: total }, (_, i) => i + 1);
+
+    if (current <= 3) return [1, 2, 3, 4, '...', total];
+    if (current >= total - 2) return [1, '...', total - 3, total - 2, total - 1, total];
+
+    return [1, '...', current - 1, current, current + 1, '...', total];
+};
+
 // ─── Page component ──────────────────────────────────────────────────────────
 
 export default function DataLogsPage() {
@@ -245,6 +254,7 @@ export default function DataLogsPage() {
                                     : "No records"}
                             </span>
                             <div className="flex items-center gap-1">
+                                {/* Nút Back */}
                                 <button
                                     onClick={() => setPage((p) => Math.max(1, p - 1))}
                                     disabled={page === 1}
@@ -253,19 +263,25 @@ export default function DataLogsPage() {
                                     <ChevronLeft className="w-3.5 h-3.5" />
                                 </button>
 
-                                {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-                                    <button
-                                        key={p}
-                                        onClick={() => setPage(p)}
-                                        className={`w-7 h-7 flex items-center justify-center rounded border text-[11px] font-medium transition ${p === page
-                                                ? "bg-[#00695c] border-[#00695c] text-white"
-                                                : "border-[#e0e0e0] text-gray-500 hover:bg-white"
-                                            }`}
-                                    >
-                                        {p}
-                                    </button>
+                                {/* Phần số trang thông minh */}
+                                {getVisiblePages(page, totalPages).map((p, idx) => (
+                                    p === '...' ? (
+                                        <span key={`dots-${idx}`} className="px-1 text-gray-400 text-[11px]">...</span>
+                                    ) : (
+                                        <button
+                                            key={p}
+                                            onClick={() => setPage(p as number)}
+                                            className={`w-7 h-7 flex items-center justify-center rounded border text-[11px] font-medium transition ${p === page
+                                                    ? "bg-[#00695c] border-[#00695c] text-white"
+                                                    : "border-[#e0e0e0] text-gray-500 hover:bg-white"
+                                                }`}
+                                        >
+                                            {p}
+                                        </button>
+                                    )
                                 ))}
 
+                                {/* Nút Next */}
                                 <button
                                     onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                                     disabled={page === totalPages}
