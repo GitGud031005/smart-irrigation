@@ -9,6 +9,8 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "chart.js": "^4.5.1",
+    "lucide-react": "^0.577.0",
     "@prisma/adapter-pg": "^7.5.0",
     "@prisma/client": "^7.5.0",
     "bcrypt": "^6.0.0",
@@ -18,6 +20,7 @@
     "next": "16.1.7",
     "pg": "^8.20.0",
     "react": "19.2.3",
+    "react-chartjs-2": "^5.3.1",
     "react-dom": "19.2.3"
   },
   "devDependencies": {
