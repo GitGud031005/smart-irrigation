@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { Thermometer, Droplets, Sprout, Power } from "lucide-react";
+import { apiCall } from "@/lib/api";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -46,16 +47,45 @@ export default function DashboardPage() {
   // Pump Control State (only for current zone)
   const [pumpState, setPumpState] = useState<boolean>(false);
 
+  // Live sensor data from MQTT via SSE stream
+  const [liveData, setLiveData] = useState<{ temperature: number | null; humidity: number | null; soilMoisture: number | null } | null>(null);
+
   const currentData = zoneData[currentZoneId];
   useEffect(() =>{
     document.title = `BK-IRRIGATION| Dashboard - ${currentData.name}`;
   })
 
-
+  // Subscribe to live MQTT sensor stream via SSE
+  useEffect(() => {
+    const source = new EventSource("/api/sensor-readings/stream");
+    source.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data as string);
+        setLiveData({
+          temperature: data.temperature ?? null,
+          humidity: data.humidity ?? null,
+          soilMoisture: data.soilMoisture ?? null,
+        });
+      } catch {
+        // ignore malformed frames
+      }
+    };
+    return () => source.close();
+  }, []);
 
   // Pump handlers
-  const togglePump = () => {
-    setPumpState((prev) => !prev);
+  const togglePump = async () => {
+    const newState = !pumpState;
+    setPumpState(newState);
+    try {
+      await apiCall("/api/pump", {
+        method: "POST",
+        body: JSON.stringify({ action: newState ? "start" : "stop" }),
+      });
+    } catch {
+      // revert on failure
+      setPumpState(!newState);
+    }
   };
 
   // --- Chart configuration ---
@@ -207,7 +237,7 @@ export default function DashboardPage() {
               <Thermometer className="w-6 h-6 text-orange-500" />
               <span className="text-sm color-[#666] font-medium uppercase">Temperature <span className="text-xs block normal-case font-normal text-gray-400">Last update just now</span></span>
             </div>
-            <div className="text-[32px] font-normal text-orange-600">{currentData.temp.toFixed(1)} <span className="text-lg">°C</span></div>
+            <div className="text-[32px] font-normal text-orange-600">{(liveData?.temperature ?? currentData.temp).toFixed(1)} <span className="text-lg">°C</span></div>
           </div>
           
           <div className="flex-1 bg-white rounded-sm shadow-sm border border-[#e0e0e0] p-4 mb-0">
@@ -215,7 +245,7 @@ export default function DashboardPage() {
               <Droplets className="w-6 h-6 text-blue-500" />
               <span className="text-sm color-[#666] font-medium uppercase">Humidity <span className="text-xs block normal-case font-normal text-gray-400">Last update just now</span></span>
             </div>
-            <div className="text-[32px] font-normal text-blue-600">{currentData.humid.toFixed(0)} <span className="text-lg">%</span></div>
+            <div className="text-[32px] font-normal text-blue-600">{(liveData?.humidity ?? currentData.humid).toFixed(0)} <span className="text-lg">%</span></div>
           </div>
           
           <div className="flex-1 bg-white rounded-sm shadow-sm border border-[#e0e0e0] p-4 mb-0">
@@ -223,7 +253,7 @@ export default function DashboardPage() {
               <Sprout className="w-6 h-6 text-emerald-500" />
               <span className="text-sm color-[#666] font-medium uppercase">Soil Moisture <span className="text-xs block normal-case font-normal text-gray-400">Last update just now</span></span>
             </div>
-            <div className="text-[32px] font-normal text-emerald-600">{currentData.soil.toFixed(0)} <span className="text-lg">%</span></div>
+            <div className="text-[32px] font-normal text-emerald-600">{(liveData?.soilMoisture ?? currentData.soil).toFixed(0)} <span className="text-lg">%</span></div>
           </div>
         </div>
 
