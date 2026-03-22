@@ -13,6 +13,7 @@ import {
   FileText,
   Calendar,
   ClipboardList,
+  Database,
   Home,
   Bell,
   ChevronDown,
@@ -30,6 +31,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (pathname.startsWith("/profiles")) return "Profiles";
     if (pathname.startsWith("/scheduler")) return "AI Scheduler";
     if (pathname.startsWith("/audit-logs")) return "Audit Logs";
+    if (pathname.startsWith("/data-logs")) return "Data Logs";
     return "Dashboard";
   }, [pathname]);
 
@@ -93,6 +95,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
             <ChevronRight className="w-3 h-3 opacity-50 hidden group-hover:inline-flex transition-opacity" />
           </Link>
+
+          <Link href="/data-logs" className={`w-full flex items-center justify-between px-5 py-2.5 group ${currentPage === "Data Logs" ? "bg-white/10 border-l-4 border-green-400" : "hover:bg-white/5"} transition-colors`}>
+            <div className="flex items-center gap-4">
+              <Database className="w-4 h-4" /> Data Logs
+            </div>
+            <ChevronRight className="w-3 h-3 opacity-50 hidden group-hover:inline-flex transition-opacity" />
+          </Link>
         </nav>
 
         {/* footer */}
@@ -113,7 +122,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <Home className="w-3.5 h-3.5 opacity-70" />
               <span>Dashboards</span>
               <ChevronRight className="w-2.5 h-2.5 opacity-40" />
-              <span className="font-bold">Audit Logs</span>
+              <span className="font-bold">{currentPage}</span>
             </div>
           </div>
 
