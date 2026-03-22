@@ -31,7 +31,7 @@ const PAGE_SIZE = 20;
 function getStatus(log: SensorLog): "normal" | "warning" | "critical" {
     const { soilMoisture: s } = log;
     if (s !== null && s < 15) return "critical";
-    if (s !== null && s < 40) return "warning";
+    if (s !== null && s < 50) return "warning";
     return "normal";
 }
 
