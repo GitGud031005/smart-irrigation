@@ -20,7 +20,7 @@ import {
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   // handle live clock state
-  const [time, setTime] = useState<string>("");
+  const [time, setTime] = useState<string | null>(null);
   const pathname = usePathname();
 
   const currentPage = useMemo(() => {
@@ -49,7 +49,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       
       {/* SIDEBAR */}
       <aside className="w-60 shrink-0 bg-[#084b36] flex flex-col text-white shadow-lg z-20">
-        {/* brand logo */}shrink-0
+        {/* brand logo */}
         <div className="p-4 flex items-center gap-3 h-14 shrink-0">
           <LayoutGrid className="w-5 h-5 text-white" />
           <span className="font-bold text-sm text-white tracking-tight uppercase">
@@ -126,8 +126,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
 
             {/* live clock */}
-            <div className="text-[11px] font-mono opacity-80 w-15 text-right">
-              {time}
+            <div className="text-[11px] font-mono opacity-80 w-15 text-right" suppressHydrationWarning>
+              {time ?? ""}
             </div>
 
             {/* notifications */}
