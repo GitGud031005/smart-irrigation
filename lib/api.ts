@@ -1,6 +1,10 @@
 // API client helper with environment-based URL
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+// Client-side: use relative URLs so the request goes to the same origin regardless of port.
+// Server-side: fall back to NEXT_PUBLIC_API_URL (needed for server → server calls).
+const API_URL =
+  typeof window !== "undefined"
+    ? ""
+    : (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000");
 
 export class ApiError extends Error {
   constructor(
