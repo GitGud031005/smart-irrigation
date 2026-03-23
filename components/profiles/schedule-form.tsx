@@ -1,1 +1,1 @@
-// Schedule add/edit form modal (cron expression, isActive toggle)
+// Schedule add/edit form modal (cron expression)
