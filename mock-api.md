@@ -970,7 +970,12 @@ DELETE /api/schedules/schedule-001-uuid
 
 ## Alerts
 
-Alert fields: `id`, `zoneId`, `message`, `createdAt`
+Alert fields: `id`, `zoneId`, `message`, `severity`, `type`, `actor`, `createdAt`
+
+**Enums:**
+- `severity`: `INFO` | `WARNING` | `CRITICAL` (default: `INFO`)
+- `type`: `DEVICE_STATUS` | `PLANT_STATUS` | `IRRIGATION_EVENT`
+- `actor`: `USER` | `SYSTEM` | `AI`
 
 ### 1. Create Alert
 
@@ -981,7 +986,10 @@ Content-Type: application/json
 
 {
   "message": "Soil moisture critically low",
-  "zoneId": "zone-001-uuid"
+  "zoneId": "zone-001-uuid",
+  "severity": "CRITICAL",
+  "type": "PLANT_STATUS",
+  "actor": "SYSTEM"
 }
 ```
 
@@ -991,9 +999,16 @@ Content-Type: application/json
   "id": "alert-001-uuid",
   "zoneId": "zone-001-uuid",
   "message": "Soil moisture critically low",
+  "severity": "CRITICAL",
+  "type": "PLANT_STATUS",
+  "actor": "SYSTEM",
   "createdAt": "2026-03-20T11:25:00Z"
 }
 ```
+
+**Notes:**
+- `message`, `type`, and `actor` are required
+- `severity` defaults to `INFO` if not provided
 
 ---
 
@@ -1011,6 +1026,9 @@ GET /api/alerts
     "id": "alert-001-uuid",
     "zoneId": "zone-001-uuid",
     "message": "Soil moisture critically low",
+    "severity": "CRITICAL",
+    "type": "PLANT_STATUS",
+    "actor": "SYSTEM",
     "createdAt": "2026-03-20T11:25:00Z"
   }
 ]
@@ -1022,15 +1040,18 @@ GET /api/alerts
 
 **Request:**
 ```http
-GET /api/alerts?zoneId=zone-001-uuid&take=10
+GET /api/alerts?zoneId=zone-001-uuid&severity=CRITICAL&type=PLANT_STATUS&actor=SYSTEM&take=10
 ```
 
 **Query Parameters:**
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `zoneId` | UUID | Filter by zone |
-| `take` | integer | Max results to return |
+| Parameter  | Type    | Description |
+|------------|---------|-------------|
+| `zoneId`   | UUID    | Filter by zone |
+| `severity` | enum    | Filter by severity (`INFO`, `WARNING`, `CRITICAL`) |
+| `type`     | enum    | Filter by type (`DEVICE_STATUS`, `PLANT_STATUS`, `IRRIGATION_EVENT`) |
+| `actor`    | enum    | Filter by actor (`USER`, `SYSTEM`, `AI`) |
+| `take`     | integer | Max results to return |
 
 **Response (200):**
 ```json
@@ -1039,6 +1060,9 @@ GET /api/alerts?zoneId=zone-001-uuid&take=10
     "id": "alert-001-uuid",
     "zoneId": "zone-001-uuid",
     "message": "Soil moisture critically low",
+    "severity": "CRITICAL",
+    "type": "PLANT_STATUS",
+    "actor": "SYSTEM",
     "createdAt": "2026-03-20T11:25:00Z"
   }
 ]
@@ -1059,6 +1083,9 @@ GET /api/alerts/alert-001-uuid
   "id": "alert-001-uuid",
   "zoneId": "zone-001-uuid",
   "message": "Soil moisture critically low",
+  "severity": "CRITICAL",
+  "type": "PLANT_STATUS",
+  "actor": "SYSTEM",
   "createdAt": "2026-03-20T11:25:00Z"
 }
 ```
@@ -1078,6 +1105,9 @@ DELETE /api/alerts/alert-001-uuid
   "id": "alert-001-uuid",
   "zoneId": "zone-001-uuid",
   "message": "Soil moisture critically low",
+  "severity": "CRITICAL",
+  "type": "PLANT_STATUS",
+  "actor": "SYSTEM",
   "createdAt": "2026-03-20T11:25:00Z"
 }
 ```

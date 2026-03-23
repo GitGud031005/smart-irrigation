@@ -89,6 +89,24 @@ enum DeviceStatus {
   ERROR
 }
 
+enum AlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum AlertType {
+  DEVICE_STATUS
+  PLANT_STATUS
+  IRRIGATION_EVENT
+}
+
+enum AlertActor {
+  USER
+  SYSTEM
+  AI
+}
+
 model SensorReading {
   id          String   @id @default(uuid()) @map("reading_id")
   
@@ -116,11 +134,14 @@ model IrrigationEvent {
 }
 
 model Alert {
-  id        String   @id @default(uuid()) @map("alert_id")
-  zone      Zone?    @relation(fields: [zoneId], references: [id])
+  id        String        @id @default(uuid()) @map("alert_id")
+  zone      Zone?         @relation(fields: [zoneId], references: [id])
   zoneId    String?
   message   String
-  createdAt DateTime @default(now()) @map("created_at")
+  severity  AlertSeverity @default(INFO)     @map("severity")
+  type      AlertType                        @map("type")
+  actor     AlertActor                       @map("actor")
+  createdAt DateTime      @default(now())    @map("created_at")
 
   @@map("ALERT")
 }

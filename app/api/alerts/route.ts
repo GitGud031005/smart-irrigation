@@ -2,13 +2,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { listAlerts, createAlert } from '@/services/alert-service'
 import { toJsonSafe } from '@/lib/utils'
+import type { AlertSeverity, AlertType, AlertActor } from '@/models/alert'
 
 export async function GET(request: NextRequest) {
 	const { searchParams } = request.nextUrl
-	const zoneId = searchParams.get('zoneId') ?? undefined
-	const take = searchParams.get('take') ? parseInt(searchParams.get('take')!, 10) : undefined
+	const zoneId    = searchParams.get('zoneId')    ?? undefined
+	const severity  = searchParams.get('severity')  as AlertSeverity | undefined
+	const type      = searchParams.get('type')      as AlertType | undefined
+	const actor     = searchParams.get('actor')     as AlertActor | undefined
+	const take      = searchParams.get('take') ? parseInt(searchParams.get('take')!, 10) : undefined
 	try {
-		const alerts = await listAlerts({ zoneId, take })
+		const alerts = await listAlerts({ zoneId, severity, type, actor, take })
 		return new NextResponse(JSON.stringify(toJsonSafe(alerts)), { headers: { 'Content-Type': 'application/json' } })
 	} catch (err) {
 		const message = err instanceof Error ? err.message : 'Unknown error'
@@ -19,6 +23,9 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
 	let body: any
 	try { body = await request.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
+	if (!body.type)  return NextResponse.json({ error: 'type is required' }, { status: 400 })
+	if (!body.actor) return NextResponse.json({ error: 'actor is required' }, { status: 400 })
+	if (!body.message) return NextResponse.json({ error: 'message is required' }, { status: 400 })
 	try {
 		const a = await createAlert(body)
 		return new NextResponse(JSON.stringify(toJsonSafe(a)), { headers: { 'Content-Type': 'application/json' }, status: 201 })
@@ -27,3 +34,4 @@ export async function POST(request: NextRequest) {
 		return NextResponse.json({ error: message }, { status: 400 })
 	}
 }
+
