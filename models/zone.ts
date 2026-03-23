@@ -4,7 +4,4 @@ export interface Zone {
   userId?: string;
   profileId?: string;
   scheduleId?: string;
-  currentMoisture: number;
-  currentHumidity: number;
-  currentTemperature: number;
 }

@@ -1,10 +1,7 @@
 export interface IrrigationEvent {
-  id: number;
-  title: string;
-  zone: number;
-  date: string;
-  start: string;
+  id: string;
+  zoneId?: string;
+  startTime: Date | string;
+  endTime: Date | string;
   duration: number;
-  type: string;
-  source: string;
 }

@@ -28,7 +28,7 @@ export async function listZones(userId?: string): Promise<Zone[]> {
   return prisma.zone.findMany({ where: { userId } });
 }
 
-export async function updateZone(id: string, data: Partial<{ name: string; userId: string | null; profileId: string | null; scheduleId: string | null; currentMoisture: number; currentHumidity: number; currentTemperature: number }>): Promise<Zone> {
+export async function updateZone(id: string, data: Partial<{ name: string; userId: string | null; profileId: string | null; scheduleId: string | null }>): Promise<Zone> {
 	if (data.scheduleId !== undefined && data.scheduleId !== null) {
 		const exists = await prisma.zone.findFirst({ where: { scheduleId: data.scheduleId, NOT: { id } } })
 		if (exists) throw new Error('Schedule already assigned to another zone')
@@ -38,9 +38,6 @@ export async function updateZone(id: string, data: Partial<{ name: string; userI
 	if (data.userId !== undefined) payload.userId = data.userId
 	if (data.profileId !== undefined) payload.profileId = data.profileId
 	if (data.scheduleId !== undefined) payload.scheduleId = data.scheduleId
-	if (data.currentMoisture !== undefined) payload.currentMoisture = data.currentMoisture
-	if (data.currentHumidity !== undefined) payload.currentHumidity = data.currentHumidity
-	if (data.currentTemperature !== undefined) payload.currentTemperature = data.currentTemperature
 	return prisma.zone.update({ where: { id }, data: payload })
 }
 

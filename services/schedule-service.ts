@@ -1,7 +1,7 @@
 import prisma from '../lib/prisma'
 import type { Schedule } from '../lib/generated/prisma/client'
 
-export async function createSchedule(data: { cronExpression: string; isActive?: boolean }): Promise<Schedule> {
+export async function createSchedule(data: { cronExpression: string }): Promise<Schedule> {
 	return prisma.schedule.create({ data })
 }
 
@@ -13,7 +13,7 @@ export async function listSchedules(): Promise<Schedule[]> {
 	return prisma.schedule.findMany()
 }
 
-export async function updateSchedule(id: string, data: Partial<{ cronExpression: string; isActive: boolean }>): Promise<Schedule> {
+export async function updateSchedule(id: string, data: Partial<{ cronExpression: string }>): Promise<Schedule> {
 	return prisma.schedule.update({ where: { id }, data })
 }
 

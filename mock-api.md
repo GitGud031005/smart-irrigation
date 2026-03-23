@@ -146,7 +146,7 @@ Content-Type: application/json
 
 ## Zones
 
-Zone fields: `id`, `name`, `userId`, `profileId`, `scheduleId`, `currentMoisture`, `currentHumidity`, `currentTemperature`
+Zone fields: `id`, `name`, `userId`, `profileId`, `scheduleId`
 
 ### 1. Create Zone
 
@@ -167,10 +167,7 @@ Content-Type: application/json
   "name": "Front Garden",
   "userId": "550e8400-e29b-41d4-a716-446655440000",
   "profileId": null,
-  "scheduleId": null,
-  "currentMoisture": 0,
-  "currentHumidity": 0,
-  "currentTemperature": 0
+  "scheduleId": null
 }
 ```
 
@@ -195,20 +192,14 @@ GET /api/zones
     "name": "Front Garden",
     "userId": "550e8400-e29b-41d4-a716-446655440000",
     "profileId": null,
-    "scheduleId": null,
-    "currentMoisture": 45.2,
-    "currentHumidity": 65.0,
-    "currentTemperature": 22.5
+    "scheduleId": null
   },
   {
     "id": "zone-002-uuid",
     "name": "Back Patio",
     "userId": "550e8400-e29b-41d4-a716-446655440000",
     "profileId": null,
-    "scheduleId": null,
-    "currentMoisture": 38.0,
-    "currentHumidity": 60.0,
-    "currentTemperature": 23.1
+    "scheduleId": null
   }
 ]
 ```
@@ -229,10 +220,7 @@ GET /api/zones/zone-001-uuid
   "name": "Front Garden",
   "userId": "550e8400-e29b-41d4-a716-446655440000",
   "profileId": "profile-001-uuid",
-  "scheduleId": null,
-  "currentMoisture": 45.2,
-  "currentHumidity": 65.0,
-  "currentTemperature": 22.5
+  "scheduleId": null
 }
 ```
 
@@ -261,10 +249,7 @@ Content-Type: application/json
   "name": "Front Garden (Updated)",
   "userId": "550e8400-e29b-41d4-a716-446655440000",
   "profileId": "profile-001-uuid",
-  "scheduleId": null,
-  "currentMoisture": 45.2,
-  "currentHumidity": 65.0,
-  "currentTemperature": 22.5
+  "scheduleId": null
 }
 ```
 
@@ -284,10 +269,7 @@ DELETE /api/zones/zone-001-uuid
   "name": "Front Garden (Updated)",
   "userId": "550e8400-e29b-41d4-a716-446655440000",
   "profileId": "profile-001-uuid",
-  "scheduleId": null,
-  "currentMoisture": 45.2,
-  "currentHumidity": 65.0,
-  "currentTemperature": 22.5
+  "scheduleId": null
 }
 ```
 
@@ -872,7 +854,7 @@ DELETE /api/profiles/profile-001-uuid
 
 ## Schedules
 
-Schedule fields: `id`, `cronExpression`, `isActive`
+Schedule fields: `id`, `cronExpression`
 
 ### 1. Create Schedule
 
@@ -882,8 +864,7 @@ POST /api/schedules
 Content-Type: application/json
 
 {
-  "cronExpression": "0 6 * * 1-5",
-  "isActive": true
+  "cronExpression": "0 6 * * 1-5"
 }
 ```
 
@@ -891,8 +872,7 @@ Content-Type: application/json
 ```json
 {
   "id": "schedule-001-uuid",
-  "cronExpression": "0 6 * * 1-5",
-  "isActive": true
+  "cronExpression": "0 6 * * 1-5"
 }
 ```
 
@@ -914,13 +894,11 @@ GET /api/schedules
 [
   {
     "id": "schedule-001-uuid",
-    "cronExpression": "0 6 * * 1-5",
-    "isActive": true
+    "cronExpression": "0 6 * * 1-5"
   },
   {
     "id": "schedule-002-uuid",
-    "cronExpression": "0 18 * * 6,0",
-    "isActive": true
+    "cronExpression": "0 18 * * 6,0"
   }
 ]
 ```
@@ -938,8 +916,7 @@ GET /api/schedules/schedule-001-uuid
 ```json
 {
   "id": "schedule-001-uuid",
-  "cronExpression": "0 6 * * 1-5",
-  "isActive": true
+  "cronExpression": "0 6 * * 1-5"
 }
 ```
 
@@ -953,8 +930,7 @@ PUT /api/schedules/schedule-001-uuid
 Content-Type: application/json
 
 {
-  "cronExpression": "30 5 * * 1-5",
-  "isActive": false
+  "cronExpression": "30 5 * * 1-5"
 }
 ```
 
@@ -962,8 +938,7 @@ Content-Type: application/json
 ```json
 {
   "id": "schedule-001-uuid",
-  "cronExpression": "30 5 * * 1-5",
-  "isActive": false
+  "cronExpression": "30 5 * * 1-5"
 }
 ```
 
@@ -980,8 +955,7 @@ DELETE /api/schedules/schedule-001-uuid
 ```json
 {
   "id": "schedule-001-uuid",
-  "cronExpression": "30 5 * * 1-5",
-  "isActive": false
+  "cronExpression": "30 5 * * 1-5"
 }
 ```
 
@@ -996,7 +970,12 @@ DELETE /api/schedules/schedule-001-uuid
 
 ## Alerts
 
-Alert fields: `id`, `zoneId`, `message`, `createdAt`
+Alert fields: `id`, `zoneId`, `message`, `severity`, `type`, `actor`, `createdAt`
+
+**Enums:**
+- `severity`: `INFO` | `WARNING` | `CRITICAL` (default: `INFO`)
+- `type`: `DEVICE_STATUS` | `PLANT_STATUS` | `IRRIGATION_EVENT`
+- `actor`: `USER` | `SYSTEM` | `AI`
 
 ### 1. Create Alert
 
@@ -1007,7 +986,10 @@ Content-Type: application/json
 
 {
   "message": "Soil moisture critically low",
-  "zoneId": "zone-001-uuid"
+  "zoneId": "zone-001-uuid",
+  "severity": "CRITICAL",
+  "type": "PLANT_STATUS",
+  "actor": "SYSTEM"
 }
 ```
 
@@ -1017,9 +999,16 @@ Content-Type: application/json
   "id": "alert-001-uuid",
   "zoneId": "zone-001-uuid",
   "message": "Soil moisture critically low",
+  "severity": "CRITICAL",
+  "type": "PLANT_STATUS",
+  "actor": "SYSTEM",
   "createdAt": "2026-03-20T11:25:00Z"
 }
 ```
+
+**Notes:**
+- `message`, `type`, and `actor` are required
+- `severity` defaults to `INFO` if not provided
 
 ---
 
@@ -1037,6 +1026,9 @@ GET /api/alerts
     "id": "alert-001-uuid",
     "zoneId": "zone-001-uuid",
     "message": "Soil moisture critically low",
+    "severity": "CRITICAL",
+    "type": "PLANT_STATUS",
+    "actor": "SYSTEM",
     "createdAt": "2026-03-20T11:25:00Z"
   }
 ]
@@ -1048,15 +1040,18 @@ GET /api/alerts
 
 **Request:**
 ```http
-GET /api/alerts?zoneId=zone-001-uuid&take=10
+GET /api/alerts?zoneId=zone-001-uuid&severity=CRITICAL&type=PLANT_STATUS&actor=SYSTEM&take=10
 ```
 
 **Query Parameters:**
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `zoneId` | UUID | Filter by zone |
-| `take` | integer | Max results to return |
+| Parameter  | Type    | Description |
+|------------|---------|-------------|
+| `zoneId`   | UUID    | Filter by zone |
+| `severity` | enum    | Filter by severity (`INFO`, `WARNING`, `CRITICAL`) |
+| `type`     | enum    | Filter by type (`DEVICE_STATUS`, `PLANT_STATUS`, `IRRIGATION_EVENT`) |
+| `actor`    | enum    | Filter by actor (`USER`, `SYSTEM`, `AI`) |
+| `take`     | integer | Max results to return |
 
 **Response (200):**
 ```json
@@ -1065,6 +1060,9 @@ GET /api/alerts?zoneId=zone-001-uuid&take=10
     "id": "alert-001-uuid",
     "zoneId": "zone-001-uuid",
     "message": "Soil moisture critically low",
+    "severity": "CRITICAL",
+    "type": "PLANT_STATUS",
+    "actor": "SYSTEM",
     "createdAt": "2026-03-20T11:25:00Z"
   }
 ]
@@ -1085,6 +1083,9 @@ GET /api/alerts/alert-001-uuid
   "id": "alert-001-uuid",
   "zoneId": "zone-001-uuid",
   "message": "Soil moisture critically low",
+  "severity": "CRITICAL",
+  "type": "PLANT_STATUS",
+  "actor": "SYSTEM",
   "createdAt": "2026-03-20T11:25:00Z"
 }
 ```
@@ -1104,6 +1105,9 @@ DELETE /api/alerts/alert-001-uuid
   "id": "alert-001-uuid",
   "zoneId": "zone-001-uuid",
   "message": "Soil moisture critically low",
+  "severity": "CRITICAL",
+  "type": "PLANT_STATUS",
+  "actor": "SYSTEM",
   "createdAt": "2026-03-20T11:25:00Z"
 }
 ```
@@ -1577,8 +1581,7 @@ POST /api/schedules
 Content-Type: application/json
 
 {
-  "cronExpression": "0 6 * * 1-5",
-  "isActive": true
+  "cronExpression": "0 6 * * 1-5"
 }
 ```
 

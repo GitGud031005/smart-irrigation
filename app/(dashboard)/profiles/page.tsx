@@ -21,17 +21,17 @@ const initialProfiles: Profile[] = [
 ];
 
 const initialSchedules: Schedule[] = [
-  { id: "sched-1", cronExpression: "AI_AUTO", isActive: true },
-  { id: "sched-2", cronExpression: "0 6,18 * * *", isActive: true },
-  { id: "sched-3", cronExpression: "0 7,12,17 * * *", isActive: true },
-  { id: "sched-4", cronExpression: "0 5 * * 1,3,5", isActive: false },
+  { id: "sched-1", cronExpression: "AI_AUTO" },
+  { id: "sched-2", cronExpression: "0 6,18 * * *" },
+  { id: "sched-3", cronExpression: "0 7,12,17 * * *" },
+  { id: "sched-4", cronExpression: "0 5 * * 1,3,5" },
 ];
 
 const initialZones: Zone[] = [
-  { id: "zone-1", name: "Ornamental Garden", profileId: "prof-1", scheduleId: "sched-1", userId: "user-1", currentMoisture: 65, currentHumidity: 55, currentTemperature: 28 },
-  { id: "zone-2", name: "Lettuce Beds", profileId: "prof-2", scheduleId: "sched-2", userId: "user-1", currentMoisture: 72, currentHumidity: 60, currentTemperature: 25 },
-  { id: "zone-3", name: "Rose Nursery", profileId: "prof-3", scheduleId: "sched-1", userId: "user-1", currentMoisture: 58, currentHumidity: 50, currentTemperature: 26 },
-  { id: "zone-4", name: "Orchid House", profileId: "prof-4", scheduleId: "sched-3", userId: "user-1", currentMoisture: 70, currentHumidity: 75, currentTemperature: 22 },
+  { id: "zone-1", name: "Ornamental Garden", profileId: "prof-1", scheduleId: "sched-1", userId: "user-1" },
+  { id: "zone-2", name: "Lettuce Beds", profileId: "prof-2", scheduleId: "sched-2", userId: "user-1" },
+  { id: "zone-3", name: "Rose Nursery", profileId: "prof-3", scheduleId: "sched-1", userId: "user-1" },
+  { id: "zone-4", name: "Orchid House", profileId: "prof-4", scheduleId: "sched-3", userId: "user-1" },
 ];
 
 const deviceCounts: Record<string, number> = { "zone-1": 3, "zone-2": 2, "zone-3": 2, "zone-4": 3 };
@@ -73,7 +73,7 @@ export default function ConfigurationPage() {
   
   // --- ZONES ---
   const openZoneModal = (zone?: Zone) => {
-    setCurrentZone(zone || { name: "", profileId: profiles[0]?.id || "", scheduleId: schedules[0]?.id || "", userId: "user-1", currentMoisture: 0, currentHumidity: 0, currentTemperature: 0 });
+    setCurrentZone(zone || { name: "", profileId: profiles[0]?.id || "", scheduleId: schedules[0]?.id || "", userId: "user-1" });
     setZoneModalOpen(true);
   };
 
@@ -83,7 +83,7 @@ export default function ConfigurationPage() {
       setZones(zones.map(z => z.id === currentZone.id ? { ...z, ...currentZone } as Zone : z));
     } else {
       const newId = `zone-${Date.now()}`;
-      setZones([...zones, { ...currentZone, id: newId, userId: "user-1", currentMoisture: 0, currentHumidity: 0, currentTemperature: 0 } as Zone]);
+      setZones([...zones, { ...currentZone, id: newId, userId: "user-1" } as Zone]);
     }
     setZoneModalOpen(false);
   };
@@ -120,7 +120,7 @@ export default function ConfigurationPage() {
 
   // --- SCHEDULES ---
   const openScheduleModal = (schedule?: Schedule) => {
-    setCurrentSchedule(schedule || { cronExpression: "", isActive: true });
+    setCurrentSchedule(schedule || { cronExpression: "" });
     setScheduleModalOpen(true);
   };
 
@@ -130,7 +130,7 @@ export default function ConfigurationPage() {
       setSchedules(schedules.map(s => s.id === currentSchedule.id ? { ...s, ...currentSchedule } as Schedule : s));
     } else {
       const newId = `sched-${Date.now()}`;
-      setSchedules([...schedules, { ...currentSchedule, id: newId, isActive: currentSchedule.isActive !== undefined ? currentSchedule.isActive : true } as Schedule]);
+      setSchedules([...schedules, { ...currentSchedule, id: newId } as Schedule]);
     }
     setScheduleModalOpen(false);
   };
@@ -269,7 +269,6 @@ export default function ConfigurationPage() {
                   <th className="text-left p-2.5 text-[10px] uppercase tracking-wide text-[#999] font-bold border-b border-[#eee] bg-[#fafafa]">ID</th>
                   <th className="text-left p-2.5 text-[10px] uppercase tracking-wide text-[#999] font-bold border-b border-[#eee] bg-[#fafafa]">Cron Expression</th>
                   <th className="text-left p-2.5 text-[10px] uppercase tracking-wide text-[#999] font-bold border-b border-[#eee] bg-[#fafafa]">Description</th>
-                  <th className="text-left p-2.5 text-[10px] uppercase tracking-wide text-[#999] font-bold border-b border-[#eee] bg-[#fafafa]">Active</th>
                   <th className="text-left p-2.5 text-[10px] uppercase tracking-wide text-[#999] font-bold border-b border-[#eee] bg-[#fafafa]">Used By</th>
                   <th className="text-left p-2.5 text-[10px] uppercase tracking-wide text-[#999] font-bold border-b border-[#eee] bg-[#fafafa] w-25">Actions</th>
                 </tr>
@@ -282,9 +281,6 @@ export default function ConfigurationPage() {
                       <td className="p-2.5 font-mono text-xs text-gray-400">{s.id.slice(0, 8)}</td>
                       <td className="p-2.5 font-mono text-sm">{s.cronExpression}</td>
                       <td className="p-2.5 text-xs text-gray-500">{cronDesc(s.cronExpression)}</td>
-                      <td className="p-2.5">
-                        <span className={`inline-block px-2 py-0.5 rounded-sm text-[10px] font-bold ${s.isActive ? 'bg-[#e0f2f1] text-[#00695c]' : 'bg-[#fff3e0] text-[#e65100]'}`}>{s.isActive ? 'Active' : 'Inactive'}</span>
-                      </td>
                       <td className="p-2.5 text-xs text-gray-500">{usedBy.length ? usedBy.join(", ") : "—"}</td>
                       <td className="p-2.5">
                         <div className="flex gap-1">
@@ -395,10 +391,7 @@ export default function ConfigurationPage() {
                 <input value={currentSchedule.cronExpression || ""} onChange={(e) => setCurrentSchedule({ ...currentSchedule, cronExpression: e.target.value })} type="text" placeholder="e.g. 0 6,18 * * *" className="w-full border border-[#ddd] p-2 text-[13px] rounded-sm outline-none focus:border-[#00695c]" />
                 <p className="text-[10px] text-gray-400 mt-1">Format: minute hour day-of-month month day-of-week</p>
               </div>
-              <div className="flex items-center gap-2 mt-4">
-                <input id="active-checkbox" type="checkbox" checked={currentSchedule.isActive ?? true} onChange={(e) => setCurrentSchedule({ ...currentSchedule, isActive: e.target.checked })} className="w-4 h-4 accent-[#00695c]" />
-                <label htmlFor="active-checkbox" className="text-[11px] font-bold uppercase tracking-wide text-[#666]">Active</label>
-              </div>
+
             </div>
             <div className="p-3 border-t border-[#eee] bg-[#fafafa] flex justify-end gap-2">
               <button onClick={() => setScheduleModalOpen(false)} className="border border-[#00695c] text-[#00695c] px-4 py-1.5 text-[11px] font-bold uppercase rounded-sm hover:bg-[#00695c] hover:text-white transition-colors">Cancel</button>
