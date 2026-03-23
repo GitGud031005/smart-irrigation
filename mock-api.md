@@ -146,7 +146,7 @@ Content-Type: application/json
 
 ## Zones
 
-Zone fields: `id`, `name`, `userId`, `profileId`, `scheduleId`, `currentMoisture`, `currentHumidity`, `currentTemperature`
+Zone fields: `id`, `name`, `userId`, `profileId`, `scheduleId`
 
 ### 1. Create Zone
 
@@ -167,10 +167,7 @@ Content-Type: application/json
   "name": "Front Garden",
   "userId": "550e8400-e29b-41d4-a716-446655440000",
   "profileId": null,
-  "scheduleId": null,
-  "currentMoisture": 0,
-  "currentHumidity": 0,
-  "currentTemperature": 0
+  "scheduleId": null
 }
 ```
 
@@ -195,20 +192,14 @@ GET /api/zones
     "name": "Front Garden",
     "userId": "550e8400-e29b-41d4-a716-446655440000",
     "profileId": null,
-    "scheduleId": null,
-    "currentMoisture": 45.2,
-    "currentHumidity": 65.0,
-    "currentTemperature": 22.5
+    "scheduleId": null
   },
   {
     "id": "zone-002-uuid",
     "name": "Back Patio",
     "userId": "550e8400-e29b-41d4-a716-446655440000",
     "profileId": null,
-    "scheduleId": null,
-    "currentMoisture": 38.0,
-    "currentHumidity": 60.0,
-    "currentTemperature": 23.1
+    "scheduleId": null
   }
 ]
 ```
@@ -229,10 +220,7 @@ GET /api/zones/zone-001-uuid
   "name": "Front Garden",
   "userId": "550e8400-e29b-41d4-a716-446655440000",
   "profileId": "profile-001-uuid",
-  "scheduleId": null,
-  "currentMoisture": 45.2,
-  "currentHumidity": 65.0,
-  "currentTemperature": 22.5
+  "scheduleId": null
 }
 ```
 
@@ -261,10 +249,7 @@ Content-Type: application/json
   "name": "Front Garden (Updated)",
   "userId": "550e8400-e29b-41d4-a716-446655440000",
   "profileId": "profile-001-uuid",
-  "scheduleId": null,
-  "currentMoisture": 45.2,
-  "currentHumidity": 65.0,
-  "currentTemperature": 22.5
+  "scheduleId": null
 }
 ```
 
@@ -284,10 +269,7 @@ DELETE /api/zones/zone-001-uuid
   "name": "Front Garden (Updated)",
   "userId": "550e8400-e29b-41d4-a716-446655440000",
   "profileId": "profile-001-uuid",
-  "scheduleId": null,
-  "currentMoisture": 45.2,
-  "currentHumidity": 65.0,
-  "currentTemperature": 22.5
+  "scheduleId": null
 }
 ```
 
@@ -872,7 +854,7 @@ DELETE /api/profiles/profile-001-uuid
 
 ## Schedules
 
-Schedule fields: `id`, `cronExpression`, `isActive`
+Schedule fields: `id`, `cronExpression`
 
 ### 1. Create Schedule
 
@@ -882,8 +864,7 @@ POST /api/schedules
 Content-Type: application/json
 
 {
-  "cronExpression": "0 6 * * 1-5",
-  "isActive": true
+  "cronExpression": "0 6 * * 1-5"
 }
 ```
 
@@ -891,8 +872,7 @@ Content-Type: application/json
 ```json
 {
   "id": "schedule-001-uuid",
-  "cronExpression": "0 6 * * 1-5",
-  "isActive": true
+  "cronExpression": "0 6 * * 1-5"
 }
 ```
 
@@ -914,13 +894,11 @@ GET /api/schedules
 [
   {
     "id": "schedule-001-uuid",
-    "cronExpression": "0 6 * * 1-5",
-    "isActive": true
+    "cronExpression": "0 6 * * 1-5"
   },
   {
     "id": "schedule-002-uuid",
-    "cronExpression": "0 18 * * 6,0",
-    "isActive": true
+    "cronExpression": "0 18 * * 6,0"
   }
 ]
 ```
@@ -938,8 +916,7 @@ GET /api/schedules/schedule-001-uuid
 ```json
 {
   "id": "schedule-001-uuid",
-  "cronExpression": "0 6 * * 1-5",
-  "isActive": true
+  "cronExpression": "0 6 * * 1-5"
 }
 ```
 
@@ -953,8 +930,7 @@ PUT /api/schedules/schedule-001-uuid
 Content-Type: application/json
 
 {
-  "cronExpression": "30 5 * * 1-5",
-  "isActive": false
+  "cronExpression": "30 5 * * 1-5"
 }
 ```
 
@@ -962,8 +938,7 @@ Content-Type: application/json
 ```json
 {
   "id": "schedule-001-uuid",
-  "cronExpression": "30 5 * * 1-5",
-  "isActive": false
+  "cronExpression": "30 5 * * 1-5"
 }
 ```
 
@@ -980,8 +955,7 @@ DELETE /api/schedules/schedule-001-uuid
 ```json
 {
   "id": "schedule-001-uuid",
-  "cronExpression": "30 5 * * 1-5",
-  "isActive": false
+  "cronExpression": "30 5 * * 1-5"
 }
 ```
 
@@ -1577,8 +1551,7 @@ POST /api/schedules
 Content-Type: application/json
 
 {
-  "cronExpression": "0 6 * * 1-5",
-  "isActive": true
+  "cronExpression": "0 6 * * 1-5"
 }
 ```
 

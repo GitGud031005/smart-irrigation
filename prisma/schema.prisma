@@ -37,7 +37,6 @@ model IrrigationProfile {
 model Schedule {
   id             String  @id @default(uuid()) @map("schedule_id")
   cronExpression String  @map("cron_expression")
-  isActive       Boolean @default(true) @map("is_active")
 
   zone Zone?
 
@@ -56,10 +55,6 @@ model Zone {
 
   schedule   Schedule? @relation(fields: [scheduleId], references: [id])
   scheduleId String? @unique
-
-  currentMoisture   Float @default(0) @map("current_moisture")
-  currentHumidity   Float @default(0) @map("current_humidity")
-  currentTemperature Float @default(0) @map("current_temperature")
 
   devices Device[]
   sensorReadings SensorReading[]
