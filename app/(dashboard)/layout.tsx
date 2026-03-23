@@ -17,6 +17,8 @@ import {
   Home,
   Bell,
   ChevronDown,
+  MapPin,
+  Sliders,
 } from "lucide-react";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -28,6 +30,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (!pathname) return "Dashboard";
     if (pathname.startsWith("/dashboard")) return "Dashboard";
     if (pathname.startsWith("/entities")) return "Entities";
+    if (pathname.startsWith("/zones")) return "Zones";
     if (pathname.startsWith("/profiles")) return "Profiles";
     if (pathname.startsWith("/scheduler")) return "AI Scheduler";
     if (pathname.startsWith("/audit-logs")) return "Audit Logs";
@@ -75,9 +78,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <ChevronRight className="w-3 h-3 opacity-50 hidden group-hover:inline-flex transition-opacity" />
           </Link>
           
+          <Link href="/zones" className={`w-full flex items-center justify-between px-5 py-2.5 group ${currentPage === "Zones" ? "bg-white/10 border-l-4 border-green-400" : "hover:bg-white/5"} transition-colors`}>
+            <div className="flex items-center gap-4">
+              <MapPin className="w-4 h-4" /> Zones
+            </div>
+            <ChevronRight className="w-3 h-3 opacity-50 hidden group-hover:inline-flex transition-opacity" />
+          </Link>
+
           <Link href="/profiles" className={`w-full flex items-center justify-between px-5 py-2.5 group ${currentPage === "Profiles" ? "bg-white/10 border-l-4 border-green-400" : "hover:bg-white/5"} transition-colors`}>
             <div className="flex items-center gap-4">
-              <FileText className="w-4 h-4" /> Profiles
+              <Sliders className="w-4 h-4" /> Profiles
             </div>
             <ChevronRight className="w-3 h-3 opacity-50 hidden group-hover:inline-flex transition-opacity" />
           </Link>
