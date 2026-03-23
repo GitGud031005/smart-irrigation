@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Plus, Settings, Trash2, X, RefreshCw } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { Plus, Settings, Trash2, X, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
 import { apiCall } from "@/lib/api";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -30,6 +30,26 @@ const ZONE_TABS = [
   { id: "4",   name: "Z4: Orchids" },
 ];
 
+const PAGE_SIZE = 10;
+
+const MOCK_DEVICES: Device[] = [
+  { id: "a1b2c3d4-0001-0000-0000-000000000001", deviceType: "Sensor Node",       zoneId: "1", status: "ACTIVE",  lastActiveAt: "2026-03-23T08:15:00Z" },
+  { id: "a1b2c3d4-0002-0000-0000-000000000002", deviceType: "Pump Controller",   zoneId: "1", status: "ACTIVE",  lastActiveAt: "2026-03-23T08:10:00Z" },
+  { id: "a1b2c3d4-0003-0000-0000-000000000003", deviceType: "Valve Controller",  zoneId: "1", status: "OFFLINE", lastActiveAt: "2026-03-22T14:30:00Z" },
+  { id: "a1b2c3d4-0004-0000-0000-000000000004", deviceType: "Sensor Node",       zoneId: "2", status: "ACTIVE",  lastActiveAt: "2026-03-23T08:14:00Z" },
+  { id: "a1b2c3d4-0005-0000-0000-000000000005", deviceType: "Drip Emitter",      zoneId: "2", status: "ERROR",   lastActiveAt: "2026-03-23T06:00:00Z" },
+  { id: "a1b2c3d4-0006-0000-0000-000000000006", deviceType: "Pump Controller",   zoneId: "2", status: "ACTIVE",  lastActiveAt: "2026-03-23T08:12:00Z" },
+  { id: "a1b2c3d4-0007-0000-0000-000000000007", deviceType: "Soil Probe",        zoneId: "3", status: "ACTIVE",  lastActiveAt: "2026-03-23T08:05:00Z" },
+  { id: "a1b2c3d4-0008-0000-0000-000000000008", deviceType: "Valve Controller",  zoneId: "3", status: "ACTIVE",  lastActiveAt: "2026-03-23T07:55:00Z" },
+  { id: "a1b2c3d4-0009-0000-0000-000000000009", deviceType: "Sensor Node",       zoneId: "3", status: "OFFLINE", lastActiveAt: "2026-03-21T22:10:00Z" },
+  { id: "a1b2c3d4-0010-0000-0000-000000000010", deviceType: "Drip Emitter",      zoneId: "4", status: "ACTIVE",  lastActiveAt: "2026-03-23T08:00:00Z" },
+  { id: "a1b2c3d4-0011-0000-0000-000000000011", deviceType: "Pump Controller",   zoneId: "4", status: "ERROR",   lastActiveAt: "2026-03-23T05:45:00Z" },
+  { id: "a1b2c3d4-0012-0000-0000-000000000012", deviceType: "Soil Probe",        zoneId: "4", status: "ACTIVE",  lastActiveAt: "2026-03-23T07:50:00Z" },
+  { id: "a1b2c3d4-0013-0000-0000-000000000013", deviceType: "Weather Station",   zoneId: null, status: "ACTIVE",  lastActiveAt: "2026-03-23T08:16:00Z" },
+  { id: "a1b2c3d4-0014-0000-0000-000000000014", deviceType: "Gateway Hub",       zoneId: null, status: "ACTIVE",  lastActiveAt: "2026-03-23T08:17:00Z" },
+  { id: "a1b2c3d4-0015-0000-0000-000000000015", deviceType: null,                zoneId: null, status: "OFFLINE", lastActiveAt: null },
+];
+
 const STATUS_BADGE: Record<DeviceStatus, string> = {
   ACTIVE:  "bg-emerald-100 text-emerald-700",
   OFFLINE: "bg-gray-100 text-gray-500",
@@ -44,6 +64,13 @@ function formatDate(iso: string | null): string {
     day: "2-digit", month: "short", year: "numeric",
     hour: "2-digit", minute: "2-digit",
   });
+}
+
+function getVisiblePages(current: number, total: number): (number | string)[] {
+  if (total <= 5) return Array.from({ length: total }, (_, i) => i + 1);
+  if (current <= 3) return [1, 2, 3, 4, "...", total];
+  if (current >= total - 2) return [1, "...", total - 3, total - 2, total - 1, total];
+  return [1, "...", current - 1, current, current + 1, "...", total];
 }
 
 // ─── Settings Modal ───────────────────────────────────────────────────────────
@@ -288,21 +315,23 @@ function AddDeviceModal({ zones, onClose, onAdd }: AddDeviceModalProps) {
 
 export default function EntitiesPage() {
   const [activeZoneIdx,  setActiveZoneIdx]  = useState(0);
-  const [devices,        setDevices]        = useState<Device[]>([]);
+  const [devices,        setDevices]        = useState<Device[]>(MOCK_DEVICES);
   const [zones,          setZones]          = useState<Zone[]>([]);
-  const [loading,        setLoading]        = useState(true);
+  const [loading,        setLoading]        = useState(false);
   const [error,          setError]          = useState<string | null>(null);
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [showAddModal,   setShowAddModal]   = useState(false);
+  const [page,           setPage]           = useState(1);
 
   const loadDevices = async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiCall<Device[]>("/api/devices");
-      setDevices(data);
+      // const data = await apiCall<Device[]>("/api/devices");
+      // setDevices(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
+      setDevices(MOCK_DEVICES);
     } finally {
       setLoading(false);
     }
@@ -323,6 +352,12 @@ export default function EntitiesPage() {
     loadZones();
   }, []);
 
+  const totalPages = Math.max(1, Math.ceil(devices.length / PAGE_SIZE));
+  const pageData = useMemo(
+    () => devices.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [devices, page]
+  );
+
   const handleSave = async (
     id: string,
     data: { deviceType: string | null; zoneId: string | null; status: DeviceStatus }
@@ -339,6 +374,13 @@ export default function EntitiesPage() {
   const handleAdd = async (data: { deviceType: string | null; zoneId: string | null; status: DeviceStatus }) => {
     await apiCall("/api/devices", { method: "POST", body: JSON.stringify(data) });
     await loadDevices();
+  };
+
+  // Map a zone ID to its display name using the loaded `zones` list.
+  const findZoneName = (id: string | null): string => {
+    if (!id) return "—";
+    const z = zones.find((z) => z.id === id);
+    return z ? z.name : id;
   };
 
   return (
@@ -391,53 +433,97 @@ export default function EntitiesPage() {
         )}
 
         {!loading && !error && (
-          <div className="flex-1 overflow-y-auto">
-            <table className="w-full text-[12px]">
-              <thead className="sticky top-0 bg-[#f9f9f9] border-b border-[#e8e8e8] z-10">
-                <tr>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide w-8">#</th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide">Device ID</th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide">Type</th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide">Zone</th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide">Status</th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide">Last Active</th>
-                  <th className="px-4 py-3 w-10"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#f0f0f0]">
-                {devices.length === 0 && (
+          <>
+            <div className="flex-1 overflow-y-auto">
+              <table className="w-full text-[12px]">
+                <thead className="sticky top-0 bg-[#f9f9f9] border-b border-[#e8e8e8] z-10">
                   <tr>
-                    <td colSpan={7} className="px-4 py-10 text-center text-gray-400">
-                      No devices registered
-                    </td>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide w-8">#</th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide">Device ID</th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide">Type</th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide min-w-30">Zone</th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide">Status</th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide">Last Active</th>
+                    <th className="px-4 py-3 w-10"></th>
                   </tr>
+                </thead>
+                <tbody className="divide-y divide-[#f0f0f0]">
+                  {pageData.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="px-4 py-10 text-center text-gray-400">
+                        No devices registered
+                      </td>
+                    </tr>
+                  )}
+                  {pageData.map((device, idx) => (
+                    <tr key={device.id} className="hover:bg-[#fafafa] transition-colors">
+                      <td className="px-4 py-2.5 text-gray-400">{(page - 1) * PAGE_SIZE + idx + 1}</td>
+                      <td className="px-4 py-2.5 font-mono text-gray-500 text-[11px]">{device.id}</td>
+                      <td className="px-4 py-2.5">{device.deviceType ?? <span className="text-gray-300">—</span>}</td>
+                      <td className="px-4 py-2.5 text-gray-500">{findZoneName(device.zoneId)}</td>
+                      <td className="px-4 py-2.5">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${STATUS_BADGE[device.status]}`}>
+                          {device.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5 text-gray-400">{formatDate(device.lastActiveAt)}</td>
+                      <td className="px-4 py-2.5">
+                        <button
+                          onClick={() => setSelectedDevice(device)}
+                          className="text-gray-400 hover:text-gray-600 transition-colors"
+                          title="Settings"
+                        >
+                          <Settings className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination Footer */}
+            <div className="shrink-0 border-t border-[#e8e8e8] px-4 py-2.5 flex items-center justify-between bg-[#f9f9f9]">
+              <span className="text-[11px] text-gray-400">
+                {devices.length > 0
+                  ? `Showing ${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, devices.length)} of ${devices.length} devices`
+                  : "No devices"}
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="w-7 h-7 flex items-center justify-center rounded border border-[#e0e0e0] text-gray-500 hover:bg-white disabled:opacity-30 disabled:cursor-not-allowed transition"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+                {getVisiblePages(page, totalPages).map((p, idx) =>
+                  p === "..." ? (
+                    <span key={`dots-${idx}`} className="px-1 text-gray-400 text-[11px]">...</span>
+                  ) : (
+                    <button
+                      key={p}
+                      onClick={() => setPage(p as number)}
+                      className={`w-7 h-7 flex items-center justify-center rounded border text-[11px] font-medium transition ${
+                        p === page
+                          ? "bg-[#00695c] border-[#00695c] text-white"
+                          : "border-[#e0e0e0] text-gray-500 hover:bg-white"
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  )
                 )}
-                {devices.map((device, idx) => (
-                  <tr key={device.id} className="hover:bg-[#fafafa] transition-colors">
-                    <td className="px-4 py-2.5 text-gray-400">{idx + 1}</td>
-                    <td className="px-4 py-2.5 font-mono text-gray-500 text-[11px]">{device.id.slice(0, 8)}…</td>
-                    <td className="px-4 py-2.5">{device.deviceType ?? <span className="text-gray-300">—</span>}</td>
-                    <td className="px-4 py-2.5 text-gray-500">{device.zoneId ?? <span className="text-gray-300">—</span>}</td>
-                    <td className="px-4 py-2.5">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${STATUS_BADGE[device.status]}`}>
-                        {device.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5 text-gray-400">{formatDate(device.lastActiveAt)}</td>
-                    <td className="px-4 py-2.5">
-                      <button
-                        onClick={() => setSelectedDevice(device)}
-                        className="text-gray-400 hover:text-gray-600 transition-colors"
-                        title="Settings"
-                      >
-                        <Settings className="w-4 h-4" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  className="w-7 h-7 flex items-center justify-center rounded border border-[#e0e0e0] text-gray-500 hover:bg-white disabled:opacity-30 disabled:cursor-not-allowed transition"
+                >
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          </>
         )}
       </div>
 
