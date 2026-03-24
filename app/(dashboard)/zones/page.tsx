@@ -7,6 +7,7 @@ import type { IrrigationProfile as Profile } from "@/models/irrigation-profile";
 import type { Schedule } from "@/models/schedule";
 import { IrrigationMode } from "@/models/irrigation-profile";
 
+
 // ─── Mock Data ────────────────────────────────────────────────────────────────
 
 const MOCK_PROFILES: Profile[] = [
@@ -17,37 +18,32 @@ const MOCK_PROFILES: Profile[] = [
 ];
 
 const MOCK_SCHEDULES: Schedule[] = [
-  { id: "sched-1", cronExpression: "AI_AUTO" },
-  { id: "sched-2", cronExpression: "0 6,18 * * *" },
-  { id: "sched-3", cronExpression: "0 7,12,17 * * *" },
-  { id: "sched-4", cronExpression: "0 5 * * 1,3,5" },
+  { id: "e7b5c3d6-8f6a-4b1e-8b1c-5f6a7b8c9d05", name: "Morning & Evening",  timeSlots: [{ id: "1a1b1c1d-0001-4a01-9001-000102030405", startTime: "06:00", days: ["Monday","Wednesday","Friday"], duration: 300, scheduleId: "e7b5c3d6-8f6a-4b1e-8b1c-5f6a7b8c9d05" }] },
+  { id: "f8c6d4e7-9a7b-4c2f-9c2d-6a7b8c9d0e16", name: "Daily Triple",        timeSlots: [{ id: "2a2b2c2d-0002-4b02-9002-000203040506", startTime: "07:00", days: ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"], duration: 120, scheduleId: "f8c6d4e7-9a7b-4c2f-9c2d-6a7b8c9d0e16" }] },
+  { id: "a9d7e5f8-1b8c-4d3a-0d3e-7b8c9d0e1f27", name: "Weekend Soak",        timeSlots: [{ id: "3a3b3c3d-0003-4c03-9003-000304050607", startTime: "08:00", days: ["Saturday","Sunday"], duration: 600, scheduleId: "a9d7e5f8-1b8c-4d3a-0d3e-7b8c9d0e1f27" }] },
+  { id: "b0e8f6a9-2c9d-4e4b-1e4f-8c9d0e1f2a38", name: "Early Morning Only",  timeSlots: [{ id: "4a4b4c4d-0004-4d04-9004-000405060708", startTime: "05:30", days: ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"], duration: 180, scheduleId: "b0e8f6a9-2c9d-4e4b-1e4f-8c9d0e1f2a38" }] },
 ];
 
 const MOCK_ZONES: Zone[] = [
-  { id: "zone-1", name: "Ornamental Garden", profileId: "prof-1", scheduleId: "sched-1", userId: "user-1" },
-  { id: "zone-2", name: "Lettuce Beds",       profileId: "prof-2", scheduleId: "sched-2", userId: "user-1" },
-  { id: "zone-3", name: "Rose Nursery",       profileId: "prof-3", scheduleId: "sched-1", userId: "user-1" },
-  { id: "zone-4", name: "Orchid House",       profileId: "prof-4", scheduleId: "sched-3", userId: "user-1" },
+  { id: "d1e2f3a4-1111-4b2c-9d3e-1f2a3b4c5d61", name: "Ornamental Garden", profileId: "a3f1c9f2-4b2e-4d7a-9a6d-1b2c3d4e5f61", scheduleId: "e7b5c3d6-8f6a-4b1e-8b1c-5f6a7b8c9d05", userId: "01234567-89ab-4cde-9fab-0123456789ab" },
+  { id: "e2f3a4b5-2222-4c3d-9e4f-2a3b4c5d6e72", name: "Lettuce Beds",       profileId: "b41f2d0a-5c3f-4e8b-8b7e-2c3d4e5f6a72", scheduleId: "f8c6d4e7-9a7b-4c2f-9c2d-6a7b8c9d0e16", userId: "01234567-89ab-4cde-9fab-0123456789ab" },
+  { id: "f3a4b5c6-3333-4d4e-9f5a-3b4c5d6e7f83", name: "Rose Nursery",       profileId: "c52e3a1b-6d4f-5f9c-7c8f-3d4e5f6a7b83", scheduleId: "e7b5c3d6-8f6a-4b1e-8b1c-5f6a7b8c9d05", userId: "01234567-89ab-4cde-9fab-0123456789ab" },
+  { id: "a4b5c6d7-4444-4e5f-9a6b-4c5d6e7f8094", name: "Orchid House",       profileId: "d6a4b2c5-7e5f-6a0d-9d0a-4e5f6a7b8c94", scheduleId: "a9d7e5f8-1b8c-4d3a-0d3e-7b8c9d0e1f27", userId: "01234567-89ab-4cde-9fab-0123456789ab" },
 ];
 
 const MOCK_DEVICE_COUNTS: Record<string, number> = {
-  "zone-1": 3,
-  "zone-2": 2,
-  "zone-3": 2,
-  "zone-4": 3,
+  "d1e2f3a4-1111-4b2c-9d3e-1f2a3b4c5d61": 3,
+  "e2f3a4b5-2222-4c3d-9e4f-2a3b4c5d6e72": 2,
+  "f3a4b5c6-3333-4d4e-9f5a-3b4c5d6e7f83": 2,
+  "a4b5c6d7-4444-4e5f-9a6b-4c5d6e7f8094": 3,
 };
 
 const PAGE_SIZE = 10;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function cronLabel(cron: string): string {
-  if (cron === "AI_AUTO") return "AI Auto";
-  const p = cron.split(" ");
-  if (p.length < 5) return cron;
-  const hrs = p[1].split(",").map((h) => `${h.padStart(2, "0")}:${p[0].padStart(2, "0")}`).join(", ");
-  const days = p[4] === "*" ? "Daily" : `Days: ${p[4]}`;
-  return `${hrs} · ${days}`;
+function scheduleLabel(s: Schedule): string {
+  return s.name || s.id;
 }
 
 function getVisiblePages(current: number, total: number): (number | string)[] {
@@ -132,7 +128,7 @@ function SettingsModal({ zone, profiles, schedules, onClose, onSave, onDelete }:
             >
               <option value="">None</option>
               {schedules.map((s) => (
-                <option key={s.id} value={s.id}>{cronLabel(s.cronExpression)}</option>
+                <option key={s.id} value={s.id}>{scheduleLabel(s)}</option>
               ))}
             </select>
           </div>
@@ -241,7 +237,7 @@ function AddZoneModal({ profiles, schedules, onClose, onAdd }: AddZoneModalProps
             >
               <option value="">None</option>
               {schedules.map((s) => (
-                <option key={s.id} value={s.id}>{cronLabel(s.cronExpression)}</option>
+                <option key={s.id} value={s.id}>{scheduleLabel(s)}</option>
               ))}
             </select>
           </div>
@@ -355,7 +351,7 @@ export default function ZonesPage() {
                       {profile?.name ?? <span className="text-gray-300">—</span>}
                     </td>
                     <td className="px-4 py-2.5 text-gray-500">
-                      {schedule ? cronLabel(schedule.cronExpression) : <span className="text-gray-300">—</span>}
+                      {schedule ? scheduleLabel(schedule) : <span className="text-gray-300">—</span>}
                     </td>
                     <td className="px-4 py-2.5 text-gray-500">{deviceCounts[zone.id] ?? 0}</td>
                     <td className="px-4 py-2.5">

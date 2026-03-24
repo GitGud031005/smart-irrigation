@@ -8,10 +8,10 @@ import { IrrigationMode } from "@/models/irrigation-profile";
 // --- Mock Data ---
 
 const MOCK_PROFILES: Profile[] = [
-  { id: "prof-1", name: "Default — Ornamental", minMoisture: 40, maxMoisture: 80, mode: IrrigationMode.AUTO },
-  { id: "prof-2", name: "Leafy Vegetables",     minMoisture: 50, maxMoisture: 90, mode: IrrigationMode.AUTO },
-  { id: "prof-3", name: "Rose Nursery",          minMoisture: 45, maxMoisture: 75, mode: IrrigationMode.AUTO },
-  { id: "prof-4", name: "Tropical — Orchids",   minMoisture: 60, maxMoisture: 95, mode: IrrigationMode.AUTO },
+  { id: "a3f1c9f2-4b2e-4d7a-9a6d-1b2c3d4e5f61", name: "Default — Ornamental", minMoisture: 40, maxMoisture: 80, mode: IrrigationMode.AUTO },
+  { id: "b41f2d0a-5c3f-4e8b-8b7e-2c3d4e5f6a72", name: "Leafy Vegetables",     minMoisture: 50, maxMoisture: 90, mode: IrrigationMode.AUTO },
+  { id: "c52e3a1b-6d4f-5f9c-7c8f-3d4e5f6a7b83", name: "Rose Nursery",          minMoisture: 45, maxMoisture: 75, mode: IrrigationMode.AUTO },
+  { id: "d6a4b2c5-7e5f-6a0d-9d0a-4e5f6a7b8c94", name: "Tropical — Orchids",   minMoisture: 60, maxMoisture: 95, mode: IrrigationMode.AUTO },
 ];
 
 const PAGE_SIZE = 10;
