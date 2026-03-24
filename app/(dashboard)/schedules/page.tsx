@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useRef, useEffect } from "react";
-import { Plus, Settings, Trash2, X, ChevronLeft, ChevronRight, Clock, ChevronDown } from "lucide-react";
+import { Plus, Settings, Trash2, X, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
 import type { Schedule, TimeSlot, DayOfWeek } from "@/models/schedule";
 import { ALL_DAYS } from "@/models/schedule";
 
@@ -167,7 +167,7 @@ function SlotRow({
 }) {
     return (
         <div className="flex flex-col gap-1.5 p-3 bg-gray-50 rounded border border-[#eee]">
-            <div className="flex items-start gap-2">
+            <div className="flex items-center gap-2">
                 {/* Start time */}
                 <div className="flex-1">
                     <label className="block text-[10px] font-bold uppercase text-gray-400 mb-1">Start</label>
@@ -188,7 +188,7 @@ function SlotRow({
                         type="number"
                         min={1}
                         step={1}
-                        className="w-full border border-[#ddd] rounded px-2 py-1.5 text-xs focus:outline-none focus:border-[#00695c]"
+                        className="w-full bg-white border border-[#ddd] rounded px-2 py-1.5 text-xs focus:outline-none focus:border-[#00695c]"
                         value={slot.duration}
                         onChange={(e) => onChange({ ...slot, duration: Math.max(1, Number(e.target.value)) })}
                     />
@@ -510,9 +510,9 @@ export default function SchedulesPage() {
                         <thead className="sticky top-0 bg-[#f9f9f9] border-b border-[#e8e8e8] z-10">
                             <tr>
                                 <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide w-8">#</th>
-                                <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide">Schedule ID</th>
-                                <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide">Name</th>
-                                <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide">Time Slots</th>
+                                <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide w-56">Schedule ID</th>
+                                <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide w-32">Name</th>
+                                <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide w-74">Time Slots</th>
                                 <th className="px-4 py-3 w-10"></th>
                             </tr>
                         </thead>
@@ -524,10 +524,10 @@ export default function SchedulesPage() {
                             )}
                             {pageData.map((sched, idx) => (
                                 <tr key={sched.id} className="hover:bg-[#fafafa] transition-colors">
-                                    <td className="px-4 py-2.5 text-gray-400">{(page - 1) * PAGE_SIZE + idx + 1}</td>
-                                    <td className="px-4 py-2.5 font-mono text-gray-500 text-[11px]">{sched.id}</td>
-                                    <td className="px-4 py-2.5 font-medium">{sched.name}</td>
-                                    <td className="px-4 py-2.5 text-gray-500">
+                                    <td className="px-4 py-2.5 w-8 text-gray-400">{(page - 1) * PAGE_SIZE + idx + 1}</td>
+                                    <td className="px-4 py-2.5 w-56 font-mono text-gray-500 text-[11px] truncate">{sched.id}</td>
+                                    <td className="px-4 py-2.5 w-32 font-medium truncate">{sched.name}</td>
+                                    <td className="px-4 py-2.5 text-gray-500 overflow-x-auto">
                                         <div className="flex flex-col gap-1">
                                             {(sched.timeSlots ?? []).length === 0 ? (
                                                 <span className="text-gray-300">—</span>
@@ -544,7 +544,7 @@ export default function SchedulesPage() {
                                             )}
                                         </div>
                                     </td>
-                                    <td className="px-4 py-2.5">
+                                    <td className="px-4 py-2.5 w-10">
                                         <button
                                             onClick={() => setSelectedSchedule(sched)}
                                             className="text-gray-400 hover:text-gray-600 transition-colors"

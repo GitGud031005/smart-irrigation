@@ -319,15 +319,15 @@ export default function ZonesPage() {
       {/* Table Card */}
       <div className="flex-1 min-h-0 flex flex-col bg-white rounded-sm shadow-sm border border-[#e0e0e0]">
         <div className="flex-1 overflow-y-auto">
-          <table className="w-full text-[12px]">
+          <table className="w-full text-[12px]" style={{ tableLayout: "fixed" }}>
             <thead className="sticky top-0 bg-[#f9f9f9] border-b border-[#e8e8e8] z-10">
               <tr>
                 <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide w-8">#</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide">Zone ID</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide">Name</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide">Profile</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide">Schedule</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide">Devices</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide w-56">Zone ID</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide w-32">Name</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide w-32">Profile</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide w-32">Schedule</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide w-16">Devices</th>
                 <th className="px-4 py-3 w-10"></th>
               </tr>
             </thead>
@@ -344,17 +344,17 @@ export default function ZonesPage() {
                 const schedule = findSchedule(zone.scheduleId);
                 return (
                   <tr key={zone.id} className="hover:bg-[#fafafa] transition-colors">
-                    <td className="px-4 py-2.5 text-gray-400">{(page - 1) * PAGE_SIZE + idx + 1}</td>
-                        <td className="px-4 py-2.5 font-mono text-gray-500 text-[11px]">{zone.id}</td>
-                    <td className="px-4 py-2.5 font-medium">{zone.name}</td>
-                    <td className="px-4 py-2.5 text-gray-500">
+                    <td className="px-4 py-2.5 w-8 text-gray-400">{(page - 1) * PAGE_SIZE + idx + 1}</td>
+                    <td className="px-4 py-2.5 w-56 font-mono text-gray-500 text-[11px]">{zone.id}</td>
+                    <td className="px-4 py-2.5 w-32 font-medium">{zone.name}</td>
+                    <td className="px-4 py-2.5 w-32 text-gray-500">
                       {profile?.name ?? <span className="text-gray-300">—</span>}
                     </td>
-                    <td className="px-4 py-2.5 text-gray-500">
+                    <td className="px-4 py-2.5 w-32 text-gray-500 truncate">
                       {schedule ? scheduleLabel(schedule) : <span className="text-gray-300">—</span>}
                     </td>
-                    <td className="px-4 py-2.5 text-gray-500">{deviceCounts[zone.id] ?? 0}</td>
-                    <td className="px-4 py-2.5">
+                    <td className="px-4 py-2.5 w-16 text-gray-500">{deviceCounts[zone.id] ?? 0}</td>
+                    <td className="px-4 py-2.5 w-10 flex flex-col items-center">
                       <button
                         onClick={() => setSelectedZone(zone)}
                         className="text-gray-400 hover:text-gray-600 transition-colors"
