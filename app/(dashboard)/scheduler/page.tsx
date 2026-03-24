@@ -17,24 +17,19 @@ const zoneNames: Record<number, string> = { 1: "Z1: Ornamental", 2: "Z2: Lettuce
 // Helpers
 const fmtDate = (d: Date) => d.toISOString().slice(0, 10);
 const pad = (n: number | string) => String(n).padStart(2, "0");
-const offsetDay = (n: number) => {
-  const d = new Date();
-  d.setDate(d.getDate() + n);
-  return fmtDate(d);
-};
 
 // --- Mock Data ---
 const initialEvents: IrrigationEvent[] = [
-  { id: 1, title: "Watering Z2: Lettuce", zone: 2, date: fmtDate(new Date()), start: "06:00", duration: 15, type: "watering", source: "ai" },
-  { id: 2, title: "Mist Z4: Orchids", zone: 4, date: fmtDate(new Date()), start: "07:30", duration: 10, type: "mist", source: "ai" },
-  { id: 3, title: "Watering Z1: Ornamental", zone: 1, date: fmtDate(new Date()), start: "10:00", duration: 15, type: "watering", source: "manual" },
-  { id: 4, title: "Watering Z2: Lettuce", zone: 2, date: fmtDate(new Date()), start: "14:30", duration: 20, type: "watering", source: "ai" },
-  { id: 5, title: "Mist Z4: Orchids", zone: 4, date: fmtDate(new Date()), start: "17:00", duration: 10, type: "mist", source: "ai" },
-  { id: 6, title: "Watering Z3: Rose Nursery", zone: 3, date: fmtDate(new Date()), start: "18:30", duration: 15, type: "watering", source: "manual" },
-  { id: 7, title: "Watering Z1: Ornamental", zone: 1, date: offsetDay(1), start: "06:30", duration: 15, type: "watering", source: "ai" },
-  { id: 8, title: "Watering Z2: Lettuce", zone: 2, date: offsetDay(1), start: "11:00", duration: 20, type: "watering", source: "ai" },
-  { id: 9, title: "Fertilize Z3: Rose", zone: 3, date: offsetDay(2), start: "08:00", duration: 30, type: "fertilize", source: "manual" },
-  { id: 10, title: "Watering Z4: Orchids", zone: 4, date: offsetDay(3), start: "09:00", duration: 10, type: "watering", source: "ai" },
+  { id: "1", zoneId: "2", startTime: "06:00", endTime: "06:15", duration: 15 },
+  { id: "2", zoneId: "4", startTime: "07:30", endTime: "07:40", duration: 10 },
+  { id: "3", zoneId: "1", startTime: "10:00", endTime: "10:15", duration: 15 },
+  { id: "4", zoneId: "2", startTime: "14:30", endTime: "14:50", duration: 20 },
+  { id: "5", zoneId: "4", startTime: "17:00", endTime: "17:10", duration: 10 },
+  { id: "6", zoneId: "3", startTime: "18:30", endTime: "18:45", duration: 15 },
+  { id: "7", zoneId: "1", startTime: "06:30", endTime: "06:45", duration: 15 },
+  { id: "8", zoneId: "2", startTime: "11:00", endTime: "11:20", duration: 20 },
+  { id: "9", zoneId: "3", startTime: "08:00", endTime: "08:30", duration: 30 },
+  { id: "10", zoneId: "4", startTime: "09:00", endTime: "09:10", duration: 10 },
 ];
 
 export default function SchedulerPage() {
@@ -46,7 +41,7 @@ export default function SchedulerPage() {
   
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [currentEvent, setCurrentEvent] = useState<Partial<IrrigationEvent>>({});
   const [aiReason, setAiReason] = useState<string | null>(null);
 
@@ -92,23 +87,23 @@ export default function SchedulerPage() {
   const hours = Array.from({ length: HOURS_END - HOURS_START + 1 }, (_, i) => HOURS_START + i);
 
   // Stats calculation
-  const aiCount = events.filter((e) => e.source === "ai").length;
-  const todayEvs = events.filter((e) => e.date === todayStr).sort((a, b) => a.start.localeCompare(b.start));
+  const todayEvs = events.sort((a, b) => {
+    const aStart = String(a.startTime);
+    const bStart = String(b.startTime);
+    return aStart.localeCompare(bStart);
+  });
   const nowTimeStr = pad(currentTime.getHours()) + ":" + pad(currentTime.getMinutes());
-  const nextEv = todayEvs.find((e) => e.start > nowTimeStr);
+  const nextEv = todayEvs.find((e) => String(e.startTime) > nowTimeStr);
 
   // --- Handlers ---
-  const cellClick = (date: string, time: string) => {
+  const cellClick = (zoneId: string, time: string) => {
     setEditingId(null);
     setAiReason(null);
     setCurrentEvent({
-      title: "",
-      zone: 1,
-      date,
-      start: time,
+      zoneId,
+      startTime: time,
+      endTime: time,
       duration: 15,
-      type: "watering",
-      source: "manual",
     });
     setIsModalOpen(true);
   };
@@ -121,12 +116,12 @@ export default function SchedulerPage() {
   };
 
   const saveEvent = () => {
-    if (!currentEvent.title || !currentEvent.date || !currentEvent.start) return;
+    if (!currentEvent.zoneId || !currentEvent.startTime) return;
     
     if (editingId !== null) {
       setEvents(events.map(e => e.id === editingId ? { ...e, ...currentEvent } as IrrigationEvent : e));
     } else {
-      const newId = Math.max(...events.map(e => e.id), 0) + 1;
+      const newId = `event-${Date.now()}`;
       setEvents([...events, { ...currentEvent, id: newId } as IrrigationEvent]);
     }
     setIsModalOpen(false);
@@ -139,31 +134,15 @@ export default function SchedulerPage() {
   };
 
   const triggerAiSuggest = () => {
-    const tmrw = offsetDay(1);
     setEditingId(null);
     setCurrentEvent({
-      title: "Watering Z2: Lettuce",
-      zone: 2,
-      date: tmrw,
-      start: "14:00",
+      zoneId: "2",
+      startTime: "14:00",
+      endTime: "14:20",
       duration: 20,
-      type: "watering",
-      source: "ai",
     });
     setAiReason("Soil moisture in Z2 predicted to drop below 35% by 14:00");
     setIsModalOpen(true);
-  };
-
-  // Auto-update title when zone or type changes
-  const handleInputChange = (field: keyof IrrigationEvent, value: string | number) => {
-    const updated = { ...currentEvent, [field]: value };
-    
-    if (field === "zone" || field === "type") {
-      const type = updated.type || "watering";
-      const prefix = type === "mist" ? "Mist" : type === "fertilize" ? "Fertilize" : "Watering";
-      updated.title = `${prefix} ${zoneNames[updated.zone as number]}`;
-    }
-    setCurrentEvent(updated);
   };
 
   return (
@@ -178,8 +157,8 @@ export default function SchedulerPage() {
         </div>
         <div className="bg-white rounded-sm shadow-sm border border-[#e0e0e0] p-4">
           <div className="text-[10px] text-[#999] uppercase font-bold tracking-wide mb-1">Next Watering</div>
-          <div className="text-[28px] font-light text-blue-600">{nextEv ? nextEv.start : "--:--"}</div>
-          <div className="text-xs text-gray-400 mt-1">{nextEv ? `${zoneNames[nextEv.zone]} (AI)` : "No more events today"}</div>
+          <div className="text-[28px] font-light text-blue-600">{nextEv ? String(nextEv.startTime) : "--:--"}</div>
+          <div className="text-xs text-gray-400 mt-1">{nextEv ? `${zoneNames[Number(nextEv.zoneId)]}` : "No more events today"}</div>
         </div>
         <div className="bg-white rounded-sm shadow-sm border border-[#e0e0e0] p-4">
           <div className="text-[10px] text-[#999] uppercase font-bold tracking-wide mb-1">AI Confidence</div>
@@ -189,7 +168,7 @@ export default function SchedulerPage() {
         <div className="bg-white rounded-sm shadow-sm border border-[#e0e0e0] p-4">
           <div className="text-[10px] text-[#999] uppercase font-bold tracking-wide mb-1">Events This Week</div>
           <div className="text-[28px] font-light text-orange-600">{events.length}</div>
-          <div className="text-xs text-gray-400 mt-1">{aiCount} AI · {events.length - aiCount} manual</div>
+          <div className="text-xs text-gray-400 mt-1">{events.length} scheduled</div>
         </div>
       </div>
 
@@ -199,7 +178,7 @@ export default function SchedulerPage() {
         {/* Toolbar */}
         <div className="flex items-center justify-between p-2.5 px-4 border-b border-[#eee] bg-white">
           <div className="flex items-center gap-3">
-            <button onClick={() => cellClick(todayStr, "06:00")} className="bg-[#00695c] text-white border-none px-3.5 py-1.5 text-[11px] font-bold uppercase rounded-sm inline-flex items-center gap-1 hover:brightness-110 transition-all">
+            <button onClick={() => cellClick("1", "06:00")} className="bg-[#00695c] text-white border-none px-3.5 py-1.5 text-[11px] font-bold uppercase rounded-sm inline-flex items-center gap-1 hover:brightness-110 transition-all">
               <Plus className="w-3 h-3" /> New Event
             </button>
             <button onClick={triggerAiSuggest} className="bg-white text-[#00695c] border border-[#ccc] px-3 py-1 text-[11px] font-bold uppercase rounded-sm inline-flex items-center gap-1 hover:bg-[#f5f5f5] transition-colors">
@@ -235,7 +214,7 @@ export default function SchedulerPage() {
             {days.map((d, di) => {
               const iso = fmtDate(d);
               const isToday = iso === todayStr;
-              const dayEvents = events.filter(e => e.date === iso);
+              const dayEvents = events;
               
               return (
                 <div key={di} className="flex-1 min-w-0 border-r border-[#f0f0f0] flex flex-col">
@@ -259,26 +238,26 @@ export default function SchedulerPage() {
                   <div className="relative flex-1">
                     {/* Background Slots */}
                     {hours.map(h => (
-                      <div key={h} onClick={() => cellClick(iso, `${pad(h)}:00`)} className="h-12 border-b border-[#f5f5f5] cursor-pointer hover:bg-[#f9fffe]" />
+                      <div key={h} onClick={() => cellClick(String(di + 1), `${pad(h)}:00`)} className="h-12 border-b border-[#f5f5f5] cursor-pointer hover:bg-[#f9fffe]" />
                     ))}
                     
                     {/* Render Events inside this day column */}
                     {dayEvents.map(ev => {
-                      const [sh, sm] = ev.start.split(":").map(Number);
+                      const startStr = String(ev.startTime);
+                      const [sh, sm] = startStr.split(":").map(Number);
                       if (sh < HOURS_START || sh > HOURS_END) return null;
                       
                       const topPx = (sh - HOURS_START) * 48 + (sm / 60) * 48;
                       const heightPx = Math.max((ev.duration / 60) * 48, 20);
                       
-                      // Style configurations based on zone/source
+                      // Zone-based styling
+                      const zoneNum = Number(ev.zoneId);
                       let styleClasses = "";
-                      if (ev.source === "ai") styleClasses = "bg-[#ede7f6] text-[#311b92] border-[#7c4dff] border-dashed";
-                      else if (ev.zone === 1) styleClasses = "bg-[#e8f5e9] text-[#1b5e20] border-[#43a047] border-solid";
-                      else if (ev.zone === 2) styleClasses = "bg-[#e3f2fd] text-[#0d47a1] border-[#1e88e5] border-solid";
-                      else if (ev.zone === 3) styleClasses = "bg-[#fce4ec] text-[#880e4f] border-[#e91e63] border-solid";
-                      else if (ev.zone === 4) styleClasses = "bg-[#f3e5f5] text-[#4a148c] border-[#8e24aa] border-solid";
-
-                      const typeIcon = ev.type === "mist" ? "💨" : ev.type === "fertilize" ? "🌱" : "💧";
+                      if (zoneNum === 1) styleClasses = "bg-[#e8f5e9] text-[#1b5e20] border-[#43a047] border-solid";
+                      else if (zoneNum === 2) styleClasses = "bg-[#e3f2fd] text-[#0d47a1] border-[#1e88e5] border-solid";
+                      else if (zoneNum === 3) styleClasses = "bg-[#fce4ec] text-[#880e4f] border-[#e91e63] border-solid";
+                      else if (zoneNum === 4) styleClasses = "bg-[#f3e5f5] text-[#4a148c] border-[#8e24aa] border-solid";
+                      else styleClasses = "bg-[#f5f5f5] text-[#666] border-[#999] border-solid";
 
                       return (
                         <div 
@@ -287,8 +266,8 @@ export default function SchedulerPage() {
                           style={{ top: topPx, height: heightPx }}
                           className={`absolute left-0.5 right-0.5 rounded-sm py-0.5 px-1 text-[10px] font-medium overflow-hidden cursor-pointer z-2 leading-tight border-l-[3px] transition-shadow hover:shadow-[0_2px_8px_rgba(0,0,0,0.18)] hover:z-10 ${styleClasses}`}
                         >
-                          <div className="font-bold truncate">{typeIcon} {ev.title}</div>
-                          {heightPx > 26 && <div className="opacity-70 text-[9px] truncate">{ev.start} · {ev.duration}m {ev.source === 'ai' && '· AI'}</div>}
+                          <div className="font-bold truncate">💧 {zoneNames[zoneNum]}</div>
+                          {heightPx > 26 && <div className="opacity-70 text-[9px] truncate">{String(ev.startTime)} · {ev.duration}m</div>}
                         </div>
                       );
                     })}
@@ -339,52 +318,29 @@ export default function SchedulerPage() {
 
               {/* Form Fields */}
               <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wide text-[#999] mb-1">Event Title</label>
-                <input type="text" value={currentEvent.title || ""} onChange={e => handleInputChange("title", e.target.value)} placeholder="e.g. Watering Z2: Lettuce" className="w-full border border-[#ddd] p-2 text-[13px] rounded-sm outline-none focus:border-[#00695c]" />
-              </div>
-              
-              <div>
                 <label className="block text-[10px] font-bold uppercase tracking-wide text-[#999] mb-1">Zone</label>
-                <select value={currentEvent.zone || 1} onChange={e => handleInputChange("zone", parseInt(e.target.value))} className="w-full border border-[#ddd] p-2 text-[13px] rounded-sm outline-none focus:border-[#00695c] bg-white">
-                  <option value={1}>Z1: Ornamental</option>
-                  <option value={2}>Z2: Lettuce</option>
-                  <option value={3}>Z3: Rose Nursery</option>
-                  <option value={4}>Z4: Orchids</option>
+                <select value={currentEvent.zoneId || 1} onChange={e => setCurrentEvent({...currentEvent, zoneId: e.target.value})} className="w-full border border-[#ddd] p-2 text-[13px] rounded-sm outline-none focus:border-[#00695c] bg-white">
+                  <option value="1">Z1: Ornamental</option>
+                  <option value="2">Z2: Lettuce</option>
+                  <option value="3">Z3: Rose Nursery</option>
+                  <option value="4">Z4: Orchids</option>
                 </select>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wide text-[#999] mb-1">Date</label>
-                  <input type="date" value={currentEvent.date || ""} onChange={e => handleInputChange("date", e.target.value)} className="w-full border border-[#ddd] p-2 text-[13px] rounded-sm outline-none focus:border-[#00695c]" />
-                </div>
                 <div>
                   <label className="block text-[10px] font-bold uppercase tracking-wide text-[#999] mb-1">Start Time</label>
-                  <input type="time" value={currentEvent.start || ""} onChange={e => handleInputChange("start", e.target.value)} className="w-full border border-[#ddd] p-2 text-[13px] rounded-sm outline-none focus:border-[#00695c]" />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wide text-[#999] mb-1">Duration (min)</label>
-                  <input type="number" min="5" max="120" step="5" value={currentEvent.duration || 15} onChange={e => handleInputChange("duration", parseInt(e.target.value))} className="w-full border border-[#ddd] p-2 text-[13px] rounded-sm outline-none focus:border-[#00695c]" />
+                  <input type="time" value={String(currentEvent.startTime || "")} onChange={e => setCurrentEvent({...currentEvent, startTime: e.target.value})} className="w-full border border-[#ddd] p-2 text-[13px] rounded-sm outline-none focus:border-[#00695c]" />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wide text-[#999] mb-1">Type</label>
-                  <select value={currentEvent.type || "watering"} onChange={e => handleInputChange("type", e.target.value)} className="w-full border border-[#ddd] p-2 text-[13px] rounded-sm outline-none focus:border-[#00695c] bg-white">
-                    <option value="watering">Watering</option>
-                    <option value="mist">Mist Spray</option>
-                    <option value="fertilize">Fertilize</option>
-                  </select>
+                  <label className="block text-[10px] font-bold uppercase tracking-wide text-[#999] mb-1">End Time</label>
+                  <input type="time" value={String(currentEvent.endTime || "")} onChange={e => setCurrentEvent({...currentEvent, endTime: e.target.value})} className="w-full border border-[#ddd] p-2 text-[13px] rounded-sm outline-none focus:border-[#00695c]" />
                 </div>
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wide text-[#999] mb-1">Source</label>
-                <select value={currentEvent.source || "manual"} onChange={e => handleInputChange("source", e.target.value)} className="w-full border border-[#ddd] p-2 text-[13px] rounded-sm outline-none focus:border-[#00695c] bg-white">
-                  <option value="manual">Manual</option>
-                  <option value="ai">AI Suggestion</option>
-                </select>
+                <label className="block text-[10px] font-bold uppercase tracking-wide text-[#999] mb-1">Duration (min)</label>
+                <input type="number" min="5" max="120" step="5" value={currentEvent.duration || 15} onChange={e => setCurrentEvent({...currentEvent, duration: parseInt(e.target.value)})} className="w-full border border-[#ddd] p-2 text-[13px] rounded-sm outline-none focus:border-[#00695c]" />
               </div>
             </div>
 

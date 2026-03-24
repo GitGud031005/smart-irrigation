@@ -8,10 +8,10 @@ import { IrrigationMode } from "@/models/irrigation-profile";
 // --- Mock Data ---
 
 const MOCK_PROFILES: Profile[] = [
-  { id: "prof-1", name: "Default — Ornamental", minMoisture: 40, maxMoisture: 80, mode: IrrigationMode.AUTO },
-  { id: "prof-2", name: "Leafy Vegetables",     minMoisture: 50, maxMoisture: 90, mode: IrrigationMode.AUTO },
-  { id: "prof-3", name: "Rose Nursery",          minMoisture: 45, maxMoisture: 75, mode: IrrigationMode.AUTO },
-  { id: "prof-4", name: "Tropical — Orchids",   minMoisture: 60, maxMoisture: 95, mode: IrrigationMode.AUTO },
+  { id: "a3f1c9f2-4b2e-4d7a-9a6d-1b2c3d4e5f61", name: "Default — Ornamental", minMoisture: 40, maxMoisture: 80, mode: IrrigationMode.AUTO },
+  { id: "b41f2d0a-5c3f-4e8b-8b7e-2c3d4e5f6a72", name: "Leafy Vegetables",     minMoisture: 50, maxMoisture: 90, mode: IrrigationMode.AUTO },
+  { id: "c52e3a1b-6d4f-5f9c-7c8f-3d4e5f6a7b83", name: "Rose Nursery",          minMoisture: 45, maxMoisture: 75, mode: IrrigationMode.AUTO },
+  { id: "d6a4b2c5-7e5f-6a0d-9d0a-4e5f6a7b8c94", name: "Tropical — Orchids",   minMoisture: 60, maxMoisture: 95, mode: IrrigationMode.AUTO },
 ];
 
 const PAGE_SIZE = 10;
@@ -254,11 +254,11 @@ export default function ProfilesPage() {
             <thead className="sticky top-0 bg-[#f9f9f9] border-b border-[#e8e8e8] z-10">
               <tr>
                 <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide w-8">#</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide">Profile ID</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide">Name</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide">Min Moisture</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide">Max Moisture</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide">Mode</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide w-56">Profile ID</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide w-32">Name</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide w-32">Min Moisture</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide w-32">Max Moisture</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide w-12">Mode</th>
                 <th className="px-4 py-3 w-10"></th>
               </tr>
             </thead>
@@ -270,17 +270,17 @@ export default function ProfilesPage() {
               )}
               {pageData.map((profile, idx) => (
                 <tr key={profile.id} className="hover:bg-[#fafafa] transition-colors">
-                  <td className="px-4 py-2.5 text-gray-400">{(page - 1) * PAGE_SIZE + idx + 1}</td>
-                  <td className="px-4 py-2.5 font-mono text-gray-500 text-[11px]">{profile.id}</td>
-                  <td className="px-4 py-2.5 font-medium">{profile.name ?? <span className="text-gray-300">-</span>}</td>
-                  <td className="px-4 py-2.5 text-blue-600 font-medium">{profile.minMoisture}%</td>
-                  <td className="px-4 py-2.5 text-emerald-600 font-medium">{profile.maxMoisture}%</td>
-                  <td className="px-4 py-2.5">
+                  <td className="px-4 py-2.5 w-8 text-gray-400">{(page - 1) * PAGE_SIZE + idx + 1}</td>
+                  <td className="px-4 py-2.5 w-56 font-mono text-gray-500 text-[11px]">{profile.id}</td>
+                  <td className="px-4 py-2.5 w-32 font-medium">{profile.name ?? <span className="text-gray-300">-</span>}</td>
+                  <td className="px-4 py-2.5 w-32 text-blue-600 font-medium">{profile.minMoisture}%</td>
+                  <td className="px-4 py-2.5 w-32 text-emerald-600 font-medium">{profile.maxMoisture}%</td>
+                  <td className="px-4 py-2.5 w-12">
                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${MODE_BADGE[profile.mode]}`}>
                       {profile.mode}
                     </span>
                   </td>
-                  <td className="px-4 py-2.5">
+                  <td className="px-4 py-2.5 w-10 flex flex-col items-center">
                     <button
                       onClick={() => setSelectedProfile(profile)}
                       className="text-gray-400 hover:text-gray-600 transition-colors"

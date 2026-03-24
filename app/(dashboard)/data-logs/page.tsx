@@ -200,17 +200,17 @@ export default function DataLogsPage() {
                                 <thead className="sticky top-0 bg-[#f9f9f9] border-b border-[#e8e8e8] z-10">
                                     <tr>
                                         <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide w-8">#</th>
-                                        <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide">Timestamp</th>
-                                        <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide">
+                                        <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide w-48">Timestamp</th>
+                                        <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide w-24">
                                             <span className="flex items-center gap-1"><Thermometer className="w-3.5 h-3.5 text-orange-400" /> Temperature</span>
                                         </th>
-                                        <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide">
+                                        <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide w-24">
                                             <span className="flex items-center gap-1"><Droplets className="w-3.5 h-3.5 text-blue-400" /> Humidity</span>
                                         </th>
-                                        <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide">
+                                        <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide w-24">
                                             <span className="flex items-center gap-1"><Sprout className="w-3.5 h-3.5 text-emerald-400" /> Soil Moisture</span>
                                         </th>
-                                        <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide w-40">Status</th>
+                                        <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide w-28">Status</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-[#f0f0f0]">
@@ -223,18 +223,18 @@ export default function DataLogsPage() {
                                         const status = getStatus(log);
                                         return (
                                             <tr key={log.id} className="hover:bg-[#fafafa] transition-colors">
-                                                <td className="px-4 py-2.5 text-gray-400">{(page - 1) * PAGE_SIZE + idx + 1}</td>
-                                                <td className="px-4 py-2.5 text-gray-600 font-mono">{formatTimestamp(log.recordedAt)}</td>
-                                                <td className="px-4 py-2.5 text-orange-600 font-medium">
+                                                <td className="px-4 py-2.5 w-8 text-gray-400">{(page - 1) * PAGE_SIZE + idx + 1}</td>
+                                                <td className="px-4 py-2.5 w-48 text-gray-600 font-mono">{formatTimestamp(log.recordedAt)}</td>
+                                                <td className="px-4 py-2.5 w-24 text-orange-600 font-medium">
                                                     {log.temperature !== null ? `${log.temperature.toFixed(1)} °C` : "—"}
                                                 </td>
-                                                <td className="px-4 py-2.5 text-blue-600 font-medium">
+                                                <td className="px-4 py-2.5 w-24 text-blue-600 font-medium">
                                                     {log.humidity !== null ? `${log.humidity.toFixed(1)} %` : "—"}
                                                 </td>
-                                                <td className="px-4 py-2.5 text-emerald-600 font-medium">
+                                                <td className="px-4 py-2.5 w-24 text-emerald-600 font-medium">
                                                     {log.soilMoisture !== null ? `${log.soilMoisture.toFixed(1)} %` : "—"}
                                                 </td>
-                                                <td className="px-4 py-2.5">
+                                                <td className="px-4 py-2.5 w-28">
                                                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${STATUS_BADGE[status]}`}>
                                                         {status}
                                                     </span>

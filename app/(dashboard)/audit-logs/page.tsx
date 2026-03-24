@@ -202,11 +202,11 @@ export default function AuditLogsPage() {
             <thead className="sticky top-0 bg-[#f9f9f9] border-b border-[#e8e8e8] z-10">
               <tr>
                 <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide w-8">#</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide min-w-35">Timestamp</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide w-48">Timestamp</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide w-20">Severity</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide min-w-30">Type</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide min-w-30">Zone</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide flex-1">Message</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide w-32">Type</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide w-32">Zone</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide flex-1 min-w-48">Message</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide w-24">Actor</th>
               </tr>
             </thead>
@@ -222,17 +222,17 @@ export default function AuditLogsPage() {
               ) : (
                 pageItems.map((a, idx) => (
                   <tr key={a.id} className="hover:bg-[#fafafa] transition-colors">
-                    <td className="px-4 py-2.5 text-gray-400">{(page - 1) * PAGE_SIZE + idx + 1}</td>
-                    <td className="px-4 py-2.5 text-gray-600 font-mono whitespace-nowrap">{formatDatetime(a.createdAt)}</td>
-                    <td className="px-4 py-2.5">
+                    <td className="px-4 py-2.5 w-8 text-gray-400">{(page - 1) * PAGE_SIZE + idx + 1}</td>
+                    <td className="px-4 py-2.5 w-48 text-gray-600 font-mono whitespace-nowrap">{formatDatetime(a.createdAt)}</td>
+                    <td className="px-4 py-2.5 w-20">
                       <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase ${SEVERITY_STYLES[a.severity]}`}>
                         {a.severity}
                       </span>
                     </td>
-                    <td className="px-4 py-2.5 text-gray-600">{TYPE_LABELS[a.type]}</td>
-                    <td className="px-4 py-2.5 text-gray-600">{a.zoneId ? zones.get(a.zoneId) || "Unknown" : "—"}</td>
-                    <td className="px-4 py-2.5 text-gray-600 break-all">{a.message}</td>
-                    <td className="px-4 py-2.5 text-gray-600">{ACTOR_LABELS[a.actor]}</td>
+                    <td className="px-4 py-2.5 w-32 text-gray-600">{TYPE_LABELS[a.type]}</td>
+                    <td className="px-4 py-2.5 w-32 text-gray-600">{a.zoneId ? zones.get(a.zoneId) || "Unknown" : "—"}</td>
+                    <td className="px-4 py-2.5 flex-1 min-w-48 text-gray-600 break-all">{a.message}</td>
+                    <td className="px-4 py-2.5 w-24 text-gray-600">{ACTOR_LABELS[a.actor]}</td>
                   </tr>
                 ))
               )}

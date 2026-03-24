@@ -35,12 +35,25 @@ model IrrigationProfile {
 }
 
 model Schedule {
-  id             String  @id @default(uuid()) @map("schedule_id")
-  cronExpression String  @map("cron_expression")
+  id        String     @id @default(uuid()) @map("schedule_id")
+  name      String
 
-  zone Zone?
+  timeSlots TimeSlot[]
+  zone      Zone?
 
   @@map("SCHEDULE")
+}
+
+model TimeSlot {
+  id         String   @id @default(uuid()) @map("timeslot_id")
+  startTime  String   @map("start_time")    // "HH:MM"
+  days       String[]                       // ["Monday","Tuesday",...]
+  duration   Int                            // seconds
+
+  schedule   Schedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  scheduleId String   @map("schedule_id")
+
+  @@map("TIME_SLOT")
 }
 
 model Zone {

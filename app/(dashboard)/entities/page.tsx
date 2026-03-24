@@ -30,7 +30,7 @@ const ZONE_TABS = [
   { id: "4",   name: "Z4: Orchids" },
 ];
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 15;
 
 const MOCK_DEVICES: Device[] = [
   { id: "a1b2c3d4-0001-0000-0000-000000000001", deviceType: "Sensor Node",       zoneId: "1", status: "ACTIVE",  lastActiveAt: "2026-03-23T08:15:00Z" },
@@ -376,13 +376,6 @@ export default function EntitiesPage() {
     await loadDevices();
   };
 
-  // Map a zone ID to its display name using the loaded `zones` list.
-  const findZoneName = (id: string | null): string => {
-    if (!id) return "—";
-    const z = zones.find((z) => z.id === id);
-    return z ? z.name : id;
-  };
-
   return (
     <div className="h-full flex flex-col text-[#333] font-sans">
 
@@ -439,11 +432,10 @@ export default function EntitiesPage() {
                 <thead className="sticky top-0 bg-[#f9f9f9] border-b border-[#e8e8e8] z-10">
                   <tr>
                     <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide w-8">#</th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide">Device ID</th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide">Type</th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide min-w-30">Zone</th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide">Status</th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide">Last Active</th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide w-56">Device ID</th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide w-32">Type</th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide w-20">Status</th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-500 uppercase tracking-wide w-48">Last Active</th>
                     <th className="px-4 py-3 w-10"></th>
                   </tr>
                 </thead>
@@ -457,17 +449,16 @@ export default function EntitiesPage() {
                   )}
                   {pageData.map((device, idx) => (
                     <tr key={device.id} className="hover:bg-[#fafafa] transition-colors">
-                      <td className="px-4 py-2.5 text-gray-400">{(page - 1) * PAGE_SIZE + idx + 1}</td>
-                      <td className="px-4 py-2.5 font-mono text-gray-500 text-[11px]">{device.id}</td>
-                      <td className="px-4 py-2.5">{device.deviceType ?? <span className="text-gray-300">—</span>}</td>
-                      <td className="px-4 py-2.5 text-gray-500">{findZoneName(device.zoneId)}</td>
-                      <td className="px-4 py-2.5">
+                      <td className="px-4 py-2.5 w-8 text-gray-400">{(page - 1) * PAGE_SIZE + idx + 1}</td>
+                      <td className="px-4 py-2.5 w-56 font-mono text-gray-500 text-[11px]">{device.id}</td>
+                      <td className="px-4 py-2.5 w-32">{device.deviceType ?? <span className="text-gray-300">—</span>}</td>
+                      <td className="px-4 py-2.5 w-20">
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${STATUS_BADGE[device.status]}`}>
                           {device.status}
                         </span>
                       </td>
-                      <td className="px-4 py-2.5 text-gray-400">{formatDate(device.lastActiveAt)}</td>
-                      <td className="px-4 py-2.5">
+                      <td className="px-4 py-2.5 w-48 text-gray-400">{formatDate(device.lastActiveAt)}</td>
+                      <td className="px-4 py-2.5 w-10 flex flex-col items-center">
                         <button
                           onClick={() => setSelectedDevice(device)}
                           className="text-gray-400 hover:text-gray-600 transition-colors"
