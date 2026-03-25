@@ -298,6 +298,10 @@ export default function EntitiesPage() {
   const [showAddModal,   setShowAddModal]   = useState(false);
   const [page,           setPage]           = useState(1);
 
+  useEffect(() => {
+    document.title = "BK-IRRIGATION | Entities";
+  }, []);
+
   const loadDevices = async () => {
     setLoading(true);
     setError(null);

@@ -49,6 +49,10 @@ export default function SchedulerPage() {
   const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
+    document.title = "BK-IRRIGATION | AI Scheduler";
+  }, []);
+
+  useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
     return () => clearInterval(timer);
   }, []);

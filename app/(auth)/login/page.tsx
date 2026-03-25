@@ -2,7 +2,7 @@
 // Full-screen overlay with email/password form, BK-IRRIGATION logo, "Sign In" button
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Sprout, Loader2 } from "lucide-react";
@@ -12,6 +12,10 @@ import { useAuth } from "@/hooks/use-auth";
 export default function LoginPage() {
   const router = useRouter();
   const { login } = useAuth();
+
+  useEffect(() => {
+    document.title = "BK-IRRIGATION | Sign In";
+  }, []);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

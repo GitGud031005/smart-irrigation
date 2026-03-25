@@ -217,6 +217,10 @@ export default function ProfilesPage() {
   const [error,           setError]           = useState<string | null>(null);
   const [page,            setPage]            = useState(1);
 
+  useEffect(() => {
+    document.title = "BK-IRRIGATION | Profiles";
+  }, []);
+
   const loadProfiles = async () => {
     setLoading(true);
     setError(null);

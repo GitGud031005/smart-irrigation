@@ -55,7 +55,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     document.title = `BK-IRRIGATION | Dashboard${currentZone ? ` - ${currentZone.name}` : ""}`;
-  });
+  }, [currentZone]);
 
   // Fetch zones and profiles on mount
   useEffect(() => {

@@ -253,6 +253,10 @@ export default function ZonesPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [page,         setPage]         = useState(1);
 
+  useEffect(() => {
+    document.title = "BK-IRRIGATION | Zones";
+  }, []);
+
   const loadAll = async () => {
     setLoading(true);
     setError(null);

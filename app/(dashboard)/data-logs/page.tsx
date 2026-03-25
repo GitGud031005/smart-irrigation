@@ -69,6 +69,10 @@ export default function DataLogsPage() {
     const [error, setError] = useState<string | null>(null);
     const [liveConnected, setLiveConnected] = useState<boolean>(false);
 
+    useEffect(() => {
+        document.title = "BK-IRRIGATION | Data Logs";
+    }, []);
+
     // On mount: POST sync (pull new data from Adafruit → DB), then GET history from DB
     useEffect(() => {
         let cancelled = false;

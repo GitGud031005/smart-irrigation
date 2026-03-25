@@ -72,6 +72,10 @@ export default function AuditLogsPage() {
   const [filterKeyword,  setFilterKeyword]  = useState<string>("");
 
   useEffect(() => {
+    document.title = "BK-IRRIGATION | Audit Logs";
+  }, []);
+
+  useEffect(() => {
     // Fetch zones and alerts in parallel
     Promise.all([
       apiCall<Zone[]>("/api/zones").catch(() => [] as Zone[]),

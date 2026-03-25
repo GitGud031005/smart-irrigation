@@ -2,7 +2,7 @@
 // Full-screen overlay with email/password/confirm form and link back to login
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Sprout, Loader2 } from "lucide-react";
@@ -12,6 +12,10 @@ import { useAuth } from "@/hooks/use-auth";
 export default function RegisterPage() {
   const router = useRouter();
   const { login } = useAuth();
+
+  useEffect(() => {
+    document.title = "BK-IRRIGATION | Sign Up";
+  }, []);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

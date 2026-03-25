@@ -415,6 +415,10 @@ export default function SchedulesPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     
+    useEffect(() => {
+    document.title = "BK-IRRIGATION | Schedules";
+    }, []);
+    
     async function loadSchedules() {
         setLoading(true);
         setError(null);
