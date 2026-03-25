@@ -23,32 +23,7 @@ type Zone = {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const ZONE_TABS = [
-  { id: "1",   name: "Z1: Ornamental" },
-  { id: "2",   name: "Z2: Lettuce" },
-  { id: "3",   name: "Z3: Rose Nursery" },
-  { id: "4",   name: "Z4: Orchids" },
-];
-
 const PAGE_SIZE = 15;
-
-const MOCK_DEVICES: Device[] = [
-  { id: "a1b2c3d4-0001-0000-0000-000000000001", deviceType: "Sensor Node",       zoneId: "1", status: "ACTIVE",  lastActiveAt: "2026-03-23T08:15:00Z" },
-  { id: "a1b2c3d4-0002-0000-0000-000000000002", deviceType: "Pump Controller",   zoneId: "1", status: "ACTIVE",  lastActiveAt: "2026-03-23T08:10:00Z" },
-  { id: "a1b2c3d4-0003-0000-0000-000000000003", deviceType: "Valve Controller",  zoneId: "1", status: "OFFLINE", lastActiveAt: "2026-03-22T14:30:00Z" },
-  { id: "a1b2c3d4-0004-0000-0000-000000000004", deviceType: "Sensor Node",       zoneId: "2", status: "ACTIVE",  lastActiveAt: "2026-03-23T08:14:00Z" },
-  { id: "a1b2c3d4-0005-0000-0000-000000000005", deviceType: "Drip Emitter",      zoneId: "2", status: "ERROR",   lastActiveAt: "2026-03-23T06:00:00Z" },
-  { id: "a1b2c3d4-0006-0000-0000-000000000006", deviceType: "Pump Controller",   zoneId: "2", status: "ACTIVE",  lastActiveAt: "2026-03-23T08:12:00Z" },
-  { id: "a1b2c3d4-0007-0000-0000-000000000007", deviceType: "Soil Probe",        zoneId: "3", status: "ACTIVE",  lastActiveAt: "2026-03-23T08:05:00Z" },
-  { id: "a1b2c3d4-0008-0000-0000-000000000008", deviceType: "Valve Controller",  zoneId: "3", status: "ACTIVE",  lastActiveAt: "2026-03-23T07:55:00Z" },
-  { id: "a1b2c3d4-0009-0000-0000-000000000009", deviceType: "Sensor Node",       zoneId: "3", status: "OFFLINE", lastActiveAt: "2026-03-21T22:10:00Z" },
-  { id: "a1b2c3d4-0010-0000-0000-000000000010", deviceType: "Drip Emitter",      zoneId: "4", status: "ACTIVE",  lastActiveAt: "2026-03-23T08:00:00Z" },
-  { id: "a1b2c3d4-0011-0000-0000-000000000011", deviceType: "Pump Controller",   zoneId: "4", status: "ERROR",   lastActiveAt: "2026-03-23T05:45:00Z" },
-  { id: "a1b2c3d4-0012-0000-0000-000000000012", deviceType: "Soil Probe",        zoneId: "4", status: "ACTIVE",  lastActiveAt: "2026-03-23T07:50:00Z" },
-  { id: "a1b2c3d4-0013-0000-0000-000000000013", deviceType: "Weather Station",   zoneId: null, status: "ACTIVE",  lastActiveAt: "2026-03-23T08:16:00Z" },
-  { id: "a1b2c3d4-0014-0000-0000-000000000014", deviceType: "Gateway Hub",       zoneId: null, status: "ACTIVE",  lastActiveAt: "2026-03-23T08:17:00Z" },
-  { id: "a1b2c3d4-0015-0000-0000-000000000015", deviceType: null,                zoneId: null, status: "OFFLINE", lastActiveAt: null },
-];
 
 const STATUS_BADGE: Record<DeviceStatus, string> = {
   ACTIVE:  "bg-emerald-100 text-emerald-700",
@@ -315,9 +290,9 @@ function AddDeviceModal({ zones, onClose, onAdd }: AddDeviceModalProps) {
 
 export default function EntitiesPage() {
   const [activeZoneIdx,  setActiveZoneIdx]  = useState(0);
-  const [devices,        setDevices]        = useState<Device[]>(MOCK_DEVICES);
+  const [devices,        setDevices]        = useState<Device[]>([]);
   const [zones,          setZones]          = useState<Zone[]>([]);
-  const [loading,        setLoading]        = useState(false);
+  const [loading,        setLoading]        = useState(true);
   const [error,          setError]          = useState<string | null>(null);
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [showAddModal,   setShowAddModal]   = useState(false);
@@ -327,11 +302,10 @@ export default function EntitiesPage() {
     setLoading(true);
     setError(null);
     try {
-      // const data = await apiCall<Device[]>("/api/devices");
-      // setDevices(data);
+      const data = await apiCall<Device[]>("/api/devices");
+      setDevices(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
-      setDevices(MOCK_DEVICES);
     } finally {
       setLoading(false);
     }
@@ -352,10 +326,18 @@ export default function EntitiesPage() {
     loadZones();
   }, []);
 
-  const totalPages = Math.max(1, Math.ceil(devices.length / PAGE_SIZE));
+  // Filter devices by selected zone tab
+  const filteredDevices = useMemo(() => {
+    if (zones.length === 0) return devices;
+    const activeZone = zones[activeZoneIdx];
+    if (!activeZone) return devices;
+    return devices.filter(d => d.zoneId === activeZone.id);
+  }, [devices, zones, activeZoneIdx]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredDevices.length / PAGE_SIZE));
   const pageData = useMemo(
-    () => devices.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
-    [devices, page]
+    () => filteredDevices.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [filteredDevices, page]
   );
 
   const handleSave = async (
@@ -395,19 +377,25 @@ export default function EntitiesPage() {
 
       {/* Zone Tabs */}
       <div className="shrink-0 flex border-b border-[#e0e0e0]">
-        {ZONE_TABS.map((zone, idx) => (
-          <button
-            key={zone.id}
-            onClick={() => setActiveZoneIdx(idx)}
-            className={`flex-1 py-2.5 text-[12px] font-bold uppercase tracking-wide transition-colors border-b-2 ${
-              activeZoneIdx === idx
-                ? "border-[#00695c] text-[#00695c] bg-white"
-                : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50"
-            }`}
-          >
-            {zone.name}
-          </button>
-        ))}
+        {zones.length === 0 ? (
+          <div className="flex-1 py-2.5 text-[12px] text-gray-300 text-center">
+            {loading ? 'Loading zones…' : 'No zones found'}
+          </div>
+        ) : (
+          zones.map((zone, idx) => (
+            <button
+              key={zone.id}
+              onClick={() => { setActiveZoneIdx(idx); setPage(1); }}
+              className={`flex-1 py-2.5 text-[12px] font-bold uppercase tracking-wide transition-colors border-b-2 ${
+                activeZoneIdx === idx
+                  ? "border-[#00695c] text-[#00695c] bg-white"
+                  : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50"
+              }`}
+            >
+              {zone.name}
+            </button>
+          ))
+        )}
       </div>
 
       {/* Table Card */}
@@ -476,8 +464,8 @@ export default function EntitiesPage() {
             {/* Pagination Footer */}
             <div className="shrink-0 border-t border-[#e8e8e8] px-4 py-2.5 flex items-center justify-between bg-[#f9f9f9]">
               <span className="text-[11px] text-gray-400">
-                {devices.length > 0
-                  ? `Showing ${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, devices.length)} of ${devices.length} devices`
+                {filteredDevices.length > 0
+                  ? `Showing ${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, filteredDevices.length)} of ${filteredDevices.length} devices`
                   : "No devices"}
               </span>
               <div className="flex items-center gap-1">

@@ -2,15 +2,16 @@
 // Shared across all authenticated pages: dashboard, entities, profiles, scheduler, audit-logs
 "use client"; // needed for the live clock hook
 
-import { useState, useEffect, useMemo } from "react";
-import { usePathname } from "next/navigation";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
+import { apiCall } from "@/lib/api";
+import { useAuth } from "@/hooks/use-auth";
 import {
   LayoutGrid,
   LayoutDashboard,
   Package,
   ChevronRight,
-  FileText,
   Calendar,
   ClipboardList,
   Database,
@@ -20,12 +21,28 @@ import {
   MapPin,
   Sliders,
   Clock,
+  X,
+  LogOut,
+  KeyRound,
 } from "lucide-react";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const { user, logout } = useAuth();
+  const router = useRouter();
+  
   // handle live clock state
   const [time, setTime] = useState<string | null>(null);
   const pathname = usePathname();
+
+  // user / header state
+  const userEmail = user?.email || '';
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [pwForm, setPwForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
+  const [pwLoading, setPwLoading] = useState(false);
+  const [pwError, setPwError] = useState<string | null>(null);
+  const [pwSuccess, setPwSuccess] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const currentPage = useMemo(() => {
     if (!pathname) return "Dashboard";
@@ -50,10 +67,56 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return () => clearInterval(timer); // cleanup on unmount
   }, []);
 
-  return (
-    // main container: full screen, flex row
+  // Close dropdown on click outside
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  const avatarInitials = useMemo(() => {
+    const local = (userEmail || 'AD').split('@')[0];
+    return local.slice(0, 2).toUpperCase();
+  }, [userEmail]);
+
+  const handleLogout = async () => {
+    await logout();
+    router.push('/login');
+  };
+
+  const handleChangePassword = async () => {
+    if (pwForm.newPassword !== pwForm.confirmPassword) {
+      setPwError('New passwords do not match');
+      return;
+    }
+    setPwLoading(true);
+    setPwError(null);
+    try {
+      await apiCall('/api/auth/password', {
+        method: 'PUT',
+        body: JSON.stringify({ currentPassword: pwForm.currentPassword, newPassword: pwForm.newPassword }),
+      });
+      setPwSuccess(true);
+      setTimeout(() => {
+        setShowPasswordModal(false);
+        setPwForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+        setPwSuccess(false);
+      }, 1500);
+    } catch (err) {
+      setPwError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setPwLoading(false);
+    }
+  };
+
+  return ( <>
+    {/* main container: full screen, flex row */}
     <div className="flex h-screen w-full bg-[#f4f7f6]">
-      
+
       {/* SIDEBAR */}
       <aside className="w-60 shrink-0 bg-[#084b36] flex flex-col text-white shadow-lg z-20">
         {/* brand logo */}
@@ -72,14 +135,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
             <ChevronRight className="w-3 h-3 opacity-50 hidden group-hover:inline-flex transition-opacity" />
           </Link>
-          
+
           <Link href="/entities" className={`w-full flex items-center justify-between px-5 py-2.5 group ${currentPage === "Entities" ? "bg-white/10 border-l-4 border-green-400" : "hover:bg-white/5"} transition-colors`}>
             <div className="flex items-center gap-4">
               <Package className="w-4 h-4" /> Entities
             </div>
             <ChevronRight className="w-3 h-3 opacity-50 hidden group-hover:inline-flex transition-opacity" />
           </Link>
-          
+
           <Link href="/zones" className={`w-full flex items-center justify-between px-5 py-2.5 group ${currentPage === "Zones" ? "bg-white/10 border-l-4 border-green-400" : "hover:bg-white/5"} transition-colors`}>
             <div className="flex items-center gap-4">
               <MapPin className="w-4 h-4" /> Zones
@@ -100,14 +163,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
             <ChevronRight className="w-3 h-3 opacity-50 hidden group-hover:inline-flex transition-opacity" />
           </Link>
-          
+
           <Link href="/scheduler" className={`w-full flex items-center justify-between px-5 py-2.5 group ${currentPage === "AI Scheduler" ? "bg-white/10 border-l-4 border-green-400" : "hover:bg-white/5"} transition-colors`}>
             <div className="flex items-center gap-4">
               <Calendar className="w-4 h-4" /> AI Scheduler
             </div>
             <ChevronRight className="w-3 h-3 opacity-50 hidden group-hover:inline-flex transition-opacity" />
           </Link>
-          
+
           <Link href="/audit-logs" className={`w-full flex items-center justify-between px-5 py-2.5 group ${currentPage === "Audit Logs" ? "bg-white/10 border-l-4 border-green-400" : "hover:bg-white/5"} transition-colors`}>
             <div className="flex items-center gap-4">
               <ClipboardList className="w-4 h-4" /> Audit Logs
@@ -131,10 +194,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* RIGHT CONTENT AREA */}
       <div className="flex flex-col flex-1 min-w-0">
-        
+
         {/* NAVBAR */}
         <header className="h-14 bg-[#084b36] shadow-md flex items-center justify-between px-4 text-white shrink-0 z-10 border-b border-white/10">
-          
+
           {/* left: breadcrumb */}
           <div className="flex items-center gap-3">
             <div className="flex items-center text-[11px] font-medium gap-2 uppercase tracking-wide">
@@ -167,12 +230,37 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </button>
 
             {/* user profile */}
-            <div className="flex items-center gap-2 border-l border-white/20 pl-4 text-[11px] cursor-pointer hover:opacity-80">
-              <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-[10px] font-bold">
-                AD
-              </div>
-              <span className="font-medium">Admin</span>
-              <ChevronDown className="w-3 h-3 opacity-60" />
+            <div ref={dropdownRef} className="relative flex items-center border-l border-white/20 pl-4">
+              <button
+                onClick={() => setDropdownOpen(o => !o)}
+                className="flex items-center gap-2 text-[11px] cursor-pointer hover:opacity-80 transition"
+              >
+                <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-[10px] font-bold">
+                  {avatarInitials}
+                </div>
+                <span className="font-medium">{userEmail ? userEmail.split('@')[0] : 'Admin'}</span>
+                <ChevronDown className="w-3 h-3 opacity-60" />
+              </button>
+
+              {dropdownOpen && (
+                <div className="absolute top-full right-0 mt-2 bg-white text-[#333] rounded shadow-lg border border-[#e0e0e0] min-w-43 py-1 z-50">
+                  <button
+                    onClick={() => { setDropdownOpen(false); setShowPasswordModal(true); }}
+                    className="w-full px-4 py-2 text-left text-[12px] flex items-center gap-2 hover:bg-gray-50 transition-colors"
+                  >
+                    <KeyRound className="w-3.5 h-3.5 text-gray-400" />
+                    Change Password
+                  </button>
+                  <div className="border-t border-[#f0f0f0]" />
+                  <button
+                    onClick={handleLogout}
+                    className="w-full px-4 py-2 text-left text-[12px] flex items-center gap-2 text-red-500 hover:bg-red-50 transition-colors"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    Logout
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </header>
@@ -184,5 +272,89 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       </div>
     </div>
+
+    {/* Change Password Modal */}
+    {showPasswordModal && (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm"
+        onClick={() => { setShowPasswordModal(false); setPwError(null); setPwForm({ currentPassword: '', newPassword: '', confirmPassword: '' }); }}
+      >
+        <div
+          className="bg-white rounded shadow-lg w-96 border border-[#e0e0e0]"
+          onClick={e => e.stopPropagation()}
+        >
+          <div className="flex justify-between items-center border-b border-[#eee] py-3 px-4">
+            <span className="font-medium text-sm text-slate-800">Change Password</span>
+            <button
+              onClick={() => { setShowPasswordModal(false); setPwError(null); setPwForm({ currentPassword: '', newPassword: '', confirmPassword: '' }); }}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="p-4 space-y-3">
+            {pwSuccess ? (
+              <p className="text-emerald-600 text-sm text-center py-4 font-medium">Password changed successfully!</p>
+            ) : (
+              <>
+                {pwError && (
+                  <p className="text-red-500 text-xs bg-red-50 px-3 py-2 rounded border border-red-100">{pwError}</p>
+                )}
+                <div>
+                  <label className="block text-[11px] font-bold uppercase text-gray-400 mb-1">Current Password</label>
+                  <input
+                    type="password"
+                    className="w-full border border-[#ddd] rounded px-2 py-1.5 text-sm focus:outline-none focus:border-[#00695c]"
+                    value={pwForm.currentPassword}
+                    onChange={e => setPwForm(f => ({ ...f, currentPassword: e.target.value }))}
+                    autoComplete="current-password"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold uppercase text-gray-400 mb-1">New Password</label>
+                  <input
+                    type="password"
+                    className="w-full border border-[#ddd] rounded px-2 py-1.5 text-sm focus:outline-none focus:border-[#00695c]"
+                    value={pwForm.newPassword}
+                    onChange={e => setPwForm(f => ({ ...f, newPassword: e.target.value }))}
+                    autoComplete="new-password"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold uppercase text-gray-400 mb-1">Confirm New Password</label>
+                  <input
+                    type="password"
+                    className="w-full border border-[#ddd] rounded px-2 py-1.5 text-sm focus:outline-none focus:border-[#00695c]"
+                    value={pwForm.confirmPassword}
+                    onChange={e => setPwForm(f => ({ ...f, confirmPassword: e.target.value }))}
+                    autoComplete="new-password"
+                  />
+                </div>
+              </>
+            )}
+          </div>
+
+          {!pwSuccess && (
+            <div className="border-t border-[#eee] py-3 px-4 flex justify-end gap-2">
+              <button
+                onClick={() => { setShowPasswordModal(false); setPwError(null); setPwForm({ currentPassword: '', newPassword: '', confirmPassword: '' }); }}
+                className="text-xs px-3 py-1.5 rounded border border-[#ddd] text-gray-500 hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleChangePassword}
+                disabled={pwLoading || !pwForm.currentPassword || !pwForm.newPassword || !pwForm.confirmPassword}
+                className="text-xs px-3 py-1.5 rounded bg-[#00695c] text-white font-bold uppercase hover:brightness-110 transition-all disabled:opacity-60"
+              >
+                {pwLoading ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    )}
+    </>
   );
 }

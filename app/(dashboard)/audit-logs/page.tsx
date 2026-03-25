@@ -5,6 +5,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Search } from "lucide-react";
 import type { AlertSeverity, AlertType, AlertActor } from "@/models/alert";
+import { apiCall } from "@/lib/api";
 
 interface AlertRow {
   id: string;
@@ -57,38 +58,11 @@ const getVisiblePages = (current: number, total: number): (number | string)[] =>
 
 const PAGE_SIZE = 15;
 
-const MOCK_ALERTS: AlertRow[] = [
-  { id: "1", zoneId: "zone-001-uuid", message: "Soil moisture critically low in zone Front Garden", severity: "CRITICAL", type: "PLANT_STATUS",      actor: "SYSTEM", createdAt: "2026-03-23T13:45:22Z" },
-  { id: "2", zoneId: "zone-002-uuid", message: "Irrigation cycle started automatically",            severity: "INFO",     type: "IRRIGATION_EVENT", actor: "AI",     createdAt: "2026-03-23T13:00:00Z" },
-  { id: "3", zoneId: "zone-001-uuid", message: "Temperature above threshold (36.2°C)",             severity: "WARNING",  type: "PLANT_STATUS",      actor: "SYSTEM", createdAt: "2026-03-23T12:45:33Z" },
-  { id: "4", zoneId: "zone-001-uuid", message: "Pump device went offline",                          severity: "CRITICAL", type: "DEVICE_STATUS",     actor: "SYSTEM", createdAt: "2026-03-23T12:30:01Z" },
-  { id: "5", zoneId: "zone-003-uuid", message: "Irrigation cycle completed — 15 min duration",     severity: "INFO",     type: "IRRIGATION_EVENT", actor: "AI",     createdAt: "2026-03-23T12:15:00Z" },
-  { id: "6", zoneId: "zone-001-uuid", message: "New sensor device registered",                      severity: "INFO",     type: "DEVICE_STATUS",     actor: "USER",   createdAt: "2026-03-23T11:50:00Z" },
-  { id: "7", zoneId: "zone-002-uuid", message: "Humidity dropped below 30% — irrigation recommended recommendedrecommendedrecommendedrecommendedrecommendedrecommendedrecommendedrecommendedrecommendedrecommendedrecommendedrecommendedrecommendedrecommended", severity: "WARNING", type: "PLANT_STATUS",   actor: "SYSTEM", createdAt: "2026-03-23T11:30:00Z" },
-  { id: "8", zoneId: "zone-001-uuid", message: "Manual irrigation triggered by user",               severity: "INFO",     type: "IRRIGATION_EVENT", actor: "USER",   createdAt: "2026-03-23T11:00:05Z" },
-  { id: "9", zoneId: "zone-001-uuid", message: "ESP32-Node-02 reconnected after offline period",    severity: "INFO",     type: "DEVICE_STATUS",     actor: "SYSTEM", createdAt: "2026-03-23T10:15:22Z" },
-  { id: "10", zoneId: "zone-004-uuid", message: "AI adjusted schedule due to weather forecast",    severity: "INFO",     type: "IRRIGATION_EVENT", actor: "AI",     createdAt: "2026-03-23T09:00:00Z" },
-  { id: "11", zoneId: "zone-003-uuid", message: "Relay-Pump-03 status changed to ERROR",            severity: "CRITICAL", type: "DEVICE_STATUS",     actor: "SYSTEM", createdAt: "2026-03-23T08:45:10Z" },
-  { id: "12", zoneId: "zone-002-uuid", message: "Soil moisture restored to optimal range",          severity: "INFO",     type: "PLANT_STATUS",      actor: "SYSTEM", createdAt: "2026-03-23T08:30:00Z" },
-  { id: "13", zoneId: "zone-001-uuid", message: "Night irrigation cycle skipped — rain detected",  severity: "WARNING",  type: "IRRIGATION_EVENT", actor: "AI",     createdAt: "2026-03-22T22:00:00Z" },
-  { id: "14", zoneId: "zone-004-uuid", message: "Device firmware update required",                   severity: "WARNING",  type: "DEVICE_STATUS",     actor: "SYSTEM", createdAt: "2026-03-22T18:00:00Z" },
-  { id: "15", zoneId: "zone-003-uuid", message: "Temperature sensor reading anomaly detected",      severity: "WARNING",  type: "PLANT_STATUS",      actor: "SYSTEM", createdAt: "2026-03-22T15:30:00Z" },
-  { id: "16", zoneId: "zone-004-uuid", message: "Scheduled irrigation started — zone Back Patio",  severity: "INFO",     type: "IRRIGATION_EVENT", actor: "AI",     createdAt: "2026-03-22T06:00:00Z" },
-];
-
-// Mock zone names for fallback during development
-const MOCK_ZONE_MAP = new Map<string, string>([
-  ["zone-001-uuid", "Front Garden"],
-  ["zone-002-uuid", "Back Patio"],
-  ["zone-003-uuid", "Vegetable Bed"],
-  ["zone-004-uuid", "Lawn Area"],
-]);
-
 export default function AuditLogsPage() {
-  const [alerts, setAlerts]     = useState<AlertRow[]>(MOCK_ALERTS);
-  const [filtered, setFiltered] = useState<AlertRow[]>(MOCK_ALERTS);
-  const [zones, setZones]       = useState<Map<string, string>>(new Map(MOCK_ZONE_MAP));
-  const [loading, setLoading]   = useState(false);
+  const [alerts, setAlerts]     = useState<AlertRow[]>([]);
+  const [filtered, setFiltered] = useState<AlertRow[]>([]);
+  const [zones, setZones]       = useState<Map<string, string>>(new Map());
+  const [loading, setLoading]   = useState(true);
   const [page, setPage]         = useState(1);
 
   // filter state
@@ -100,20 +74,17 @@ export default function AuditLogsPage() {
   useEffect(() => {
     // Fetch zones and alerts in parallel
     Promise.all([
-      fetch("/api/zones").then((r) => r.json()).catch(() => []),
-      fetch("/api/alerts?take=200").then((r) => r.json()).catch(() => []),
+      apiCall<Zone[]>("/api/zones").catch(() => [] as Zone[]),
+      apiCall<AlertRow[]>("/api/alerts?take=200").catch(() => [] as AlertRow[]),
     ]).then(([zonesData, alertsData]) => {
-      // Map zoneId to zone name — use API data, fallback to mock
-      const zoneMap = new Map<string, string>(MOCK_ZONE_MAP);
-      if (Array.isArray(zonesData) && zonesData.length > 0) {
+      const zoneMap = new Map<string, string>();
+      if (Array.isArray(zonesData)) {
         zonesData.forEach((z: Zone) => zoneMap.set(z.id, z.name));
       }
       setZones(zoneMap);
-      // Use API alerts if available, otherwise keep mock data
-      if (Array.isArray(alertsData) && alertsData.length > 0) {
-        setAlerts(alertsData);
-        setFiltered(alertsData);
-      }
+      const rows = Array.isArray(alertsData) ? alertsData : [];
+      setAlerts(rows);
+      setFiltered(rows);
     }).finally(() => setLoading(false));
   }, []);
 

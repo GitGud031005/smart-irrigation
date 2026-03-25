@@ -24,7 +24,7 @@ const ZONES = [
     { id: 4, name: "Z4: Orchids" },
 ];
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 15;
 
 // ─── Status thresholds (frontend only — no status field in DB) ───────────────
 

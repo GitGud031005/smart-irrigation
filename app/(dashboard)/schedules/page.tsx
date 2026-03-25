@@ -1,47 +1,14 @@
 "use client";
 
 import { useState, useMemo, useRef, useEffect } from "react";
-import { Plus, Settings, Trash2, X, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
+import { Plus, Settings, Trash2, X, ChevronLeft, ChevronRight, ChevronDown, RefreshCw } from "lucide-react";
 import type { Schedule, TimeSlot, DayOfWeek } from "@/models/schedule";
 import { ALL_DAYS } from "@/models/schedule";
+import { apiCall } from "@/lib/api";
 
-// ─── Mock Data ────────────────────────────────────────────────────────────────
+// (Removed mock schedules — load from API below)
 
-const MOCK_SCHEDULES: Schedule[] = [
-    {
-        id: "e7b5c3d6-8f6a-4b1e-8b1c-5f6a7b8c9d05",
-        name: "Morning & Evening",
-        timeSlots: [
-            { id: "1a1b1c1d-0001-4a01-9001-000102030405", startTime: "06:00", days: ["Monday", "Wednesday", "Friday"], duration: 300, scheduleId: "e7b5c3d6-8f6a-4b1e-8b1c-5f6a7b8c9d05" },
-            { id: "1a1b1c1d-0002-4a02-9002-000102030406", startTime: "18:00", days: ["Monday", "Wednesday", "Friday"], duration: 180, scheduleId: "e7b5c3d6-8f6a-4b1e-8b1c-5f6a7b8c9d05" },
-        ],
-    },
-    {
-        id: "f8c6d4e7-9a7b-4c2f-9c2d-6a7b8c9d0e16",
-        name: "Daily Triple",
-        timeSlots: [
-            { id: "2a2b2c2d-0003-4b03-9003-000203040506", startTime: "07:00", days: ALL_DAYS, duration: 120, scheduleId: "f8c6d4e7-9a7b-4c2f-9c2d-6a7b8c9d0e16" },
-            { id: "2a2b2c2d-0004-4b04-9004-000203040507", startTime: "12:00", days: ALL_DAYS, duration: 60, scheduleId: "f8c6d4e7-9a7b-4c2f-9c2d-6a7b8c9d0e16" },
-            { id: "2a2b2c2d-0005-4b05-9005-000203040508", startTime: "17:00", days: ALL_DAYS, duration: 120, scheduleId: "f8c6d4e7-9a7b-4c2f-9c2d-6a7b8c9d0e16" },
-        ],
-    },
-    {
-        id: "a9d7e5f8-1b8c-4d3a-0d3e-7b8c9d0e1f27",
-        name: "Weekend Soak",
-        timeSlots: [
-            { id: "3a3b3c3d-0006-4c06-9006-000304050607", startTime: "08:00", days: ["Saturday", "Sunday"], duration: 600, scheduleId: "a9d7e5f8-1b8c-4d3a-0d3e-7b8c9d0e1f27" },
-        ],
-    },
-    {
-        id: "b0e8f6a9-2c9d-4e4b-1e4f-8c9d0e1f2a38",
-        name: "Early Morning Only",
-        timeSlots: [
-            { id: "4a4b4c4d-0007-4d07-9007-000405060709", startTime: "05:30", days: ALL_DAYS, duration: 180, scheduleId: "b0e8f6a9-2c9d-4e4b-1e4f-8c9d0e1f2a38" },
-        ],
-    },
-];
-
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 15;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -67,8 +34,7 @@ const TIME_OPTIONS = generateTimeOptions();
 function daysLabel(days: DayOfWeek[]): string {
     if (days.length === 7) return "Every day";
     if (days.length === 0) return "No days";
-    if (days.length <= 3) return days.map((d) => d.slice(0, 3)).join(", ");
-    return `${days.length} days`;
+    return days.map((d) => d.slice(0, 3)).join(", ");
 }
 
 function fmtDuration(seconds: number): string {
@@ -445,7 +411,24 @@ function AddScheduleModal({ onClose, onAdd }: AddScheduleModalProps) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function SchedulesPage() {
-    const [schedules, setSchedules] = useState<Schedule[]>(MOCK_SCHEDULES);
+    const [schedules, setSchedules] = useState<Schedule[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    
+    async function loadSchedules() {
+        setLoading(true);
+        setError(null);
+        try {
+            const data = await apiCall<Schedule[]>('/api/schedules');
+            setSchedules(Array.isArray(data) ? data : []);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to load schedules');
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    useEffect(() => { loadSchedules(); }, []);
     const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null);
     const [showAddModal, setShowAddModal] = useState(false);
     const [page, setPage] = useState(1);
@@ -456,34 +439,62 @@ export default function SchedulesPage() {
         [schedules, page],
     );
 
-    function handleSave(id: string, data: { name: string; timeSlots: Omit<TimeSlot, "id" | "scheduleId">[] }) {
-        setSchedules((prev) =>
-            prev.map((s) =>
-                s.id === id
-                    ? {
-                        ...s,
-                        name: data.name,
-                        timeSlots: data.timeSlots.map((ts, i) => ({ ...ts, id: `${id}-ts-${i}`, scheduleId: id })),
-                    }
-                    : s
-            )
-        );
+    async function handleSave(id: string, data: { name: string; timeSlots: Omit<TimeSlot, "id" | "scheduleId">[] }) {
+        try {
+            await apiCall(`/api/schedules/${encodeURIComponent(id)}`, {
+                method: "PUT",
+                body: JSON.stringify({
+                    name: data.name,
+                    timeSlots: data.timeSlots,
+                }),
+            });
+            // Update local state on success
+            setSchedules((prev) =>
+                prev.map((s) =>
+                    s.id === id
+                        ? {
+                            ...s,
+                            name: data.name,
+                            timeSlots: data.timeSlots.map((ts, i) => ({ ...ts, id: `${id}-ts-${i}`, scheduleId: id })),
+                        }
+                        : s
+                )
+            );
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : "Failed to update schedule";
+            alert(`Error: ${msg}`);
+        }
     }
 
-    function handleDelete(id: string) {
-        setSchedules((prev) => prev.filter((s) => s.id !== id));
+    async function handleDelete(id: string) {
+        if (!confirm("Delete this schedule? This cannot be undone.")) return;
+        try {
+            await apiCall(`/api/schedules/${encodeURIComponent(id)}`, {
+                method: "DELETE",
+            });
+            // Update local state on success
+            setSchedules((prev) => prev.filter((s) => s.id !== id));
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : "Failed to delete schedule";
+            alert(`Error: ${msg}`);
+        }
     }
 
-    function handleAdd(data: { name: string; timeSlots: Omit<TimeSlot, "id" | "scheduleId">[] }) {
-        const id = `sched-${Date.now()}`;
-        setSchedules((prev) => [
-            ...prev,
-            {
-                id,
-                name: data.name,
-                timeSlots: data.timeSlots.map((ts, i) => ({ ...ts, id: `${id}-ts-${i}`, scheduleId: id })),
-            },
-        ]);
+    async function handleAdd(data: { name: string; timeSlots: Omit<TimeSlot, "id" | "scheduleId">[] }) {
+        try {
+            const response = await apiCall<Schedule>("/api/schedules", {
+                method: "POST",
+                body: JSON.stringify({
+                    name: data.name,
+                    timeSlots: data.timeSlots,
+                }),
+            });
+            // Add the server-returned schedule (with real IDs) to local state
+            setSchedules((prev) => [...prev, response]);
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : "Failed to create schedule";
+            alert(`Error: ${msg}`);
+        }
     }
 
     return (
@@ -505,6 +516,17 @@ export default function SchedulesPage() {
 
             {/* Table Card */}
             <div className="flex-1 min-h-0 flex flex-col bg-white rounded-sm shadow-sm border border-[#e0e0e0]">
+                {loading && (
+                    <div className="flex-1 flex items-center justify-center gap-2 text-gray-400 text-sm">
+                        <RefreshCw className="w-4 h-4 animate-spin" /> Loading schedules…
+                    </div>
+                )}
+                {!loading && error && (
+                    <div className="flex-1 flex items-center justify-center text-red-500 text-sm">
+                        Error: {error}
+                    </div>
+                )}
+                {!loading && !error && (
                 <div className="flex-1 overflow-y-auto">
                     <table className="w-full text-[12px]">
                         <thead className="sticky top-0 bg-[#f9f9f9] border-b border-[#e8e8e8] z-10">
@@ -558,6 +580,7 @@ export default function SchedulesPage() {
                         </tbody>
                     </table>
                 </div>
+                )}
 
                 {/* Pagination Footer */}
                 <div className="shrink-0 border-t border-[#e8e8e8] px-4 py-2.5 flex items-center justify-between bg-[#f9f9f9]">
@@ -604,8 +627,8 @@ export default function SchedulesPage() {
                 <SettingsModal
                     schedule={selectedSchedule}
                     onClose={() => setSelectedSchedule(null)}
-                    onSave={handleSave}
-                    onDelete={handleDelete}
+                    onSave={(id, data) => handleSave(id, data).then(() => setSelectedSchedule(null)).catch(() => {})}
+                    onDelete={(id) => handleDelete(id).then(() => setSelectedSchedule(null)).catch(() => {})}
                 />
             )}
 
@@ -613,7 +636,7 @@ export default function SchedulesPage() {
             {showAddModal && (
                 <AddScheduleModal
                     onClose={() => setShowAddModal(false)}
-                    onAdd={handleAdd}
+                    onAdd={(data) => handleAdd(data).then(() => setShowAddModal(false)).catch(() => {})}
                 />
             )}
         </div>

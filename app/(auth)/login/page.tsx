@@ -7,9 +7,11 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Sprout, Loader2 } from "lucide-react";
 import { apiCall, ApiError } from "@/lib/api";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { login } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -21,10 +23,12 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
     try {
-      await apiCall("/api/auth/login", {
+      const response = await apiCall<{ userId: string; email: string }>("/api/auth/login", {
         method: "POST",
         body: JSON.stringify({ email, password }),
       });
+      // Update auth context
+      login(response);
       router.push("/dashboard");
     } catch (err) {
       if (err instanceof ApiError) {

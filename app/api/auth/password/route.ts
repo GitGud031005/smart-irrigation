@@ -1,7 +1,7 @@
 // PUT /api/auth/password — Change user password
 
 import { NextRequest, NextResponse } from 'next/server'
-import { updateUserPassword } from '@/services/auth-service'
+import { updateUserPassword, getUserById } from '@/services/auth-service'
 import { verifyToken, COOKIE_NAME } from '@/lib/auth'
 import bcrypt from 'bcrypt'
 
@@ -28,11 +28,13 @@ export async function PUT(request: NextRequest) {
 		const userId = payload.userId as string
 
 		// Verify current password matches
-		// TODO: Fetch user and compare currentPassword with stored passwordHash
-		// For now, just verify token is valid and call the service
+		const user = await getUserById(userId)
+		if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+		const passwordMatch = await bcrypt.compare(currentPassword, user.passwordHash)
+		if (!passwordMatch) return NextResponse.json({ error: 'Current password is incorrect' }, { status: 403 })
 
-		const user = await updateUserPassword(userId, newPassword)
-		return NextResponse.json({ success: true, user: { id: user.id, email: user.email } })
+		const updated = await updateUserPassword(userId, newPassword)
+		return NextResponse.json({ success: true, user: { id: updated.id, email: updated.email } })
 	} catch (err) {
 		const message = err instanceof Error ? err.message : 'Unknown error'
 		return NextResponse.json({ error: message }, { status: 500 })

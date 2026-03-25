@@ -1,12 +1,10 @@
-// Dashboard Screen (Mockup 4.2)
-// Left column: parameter cards (temperature, humidity, soil moisture) and manual irrigation control panel
-// Right column: temperature chart, moisture chart, and zone status bars
-// Controls: time filter (day/week), zone selection, reset
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
 import { Thermometer, Droplets, Sprout, Power } from "lucide-react";
 import { apiCall } from "@/lib/api";
+import type { Zone } from "@/models/zone";
+import type { IrrigationProfile } from "@/models/irrigation-profile";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -19,41 +17,72 @@ import {
 import dynamic from "next/dynamic";
 const Line = dynamic(() => import("react-chartjs-2").then((mod) => mod.Line), { ssr: false });
 
-// Register required Chart.js modules
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Filler);
 
-// Deterministic pseudo-random generator (pure function) for mock data.
-function pseudoRandom(seed: number) {
-  let t = seed + 0x6D2B79F5;
-  t = Math.imul(t ^ (t >>> 15), t | 1);
-  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-  return ((t ^ (t >>> 14)) >>> 0) / 4294967295;
-}
-
-// --- Mock Data ---
-const zoneData: Record<number, { name: string; temp: number; humid: number; soil: number }> = {
-  0: { name: "Global Average", temp: 28.5, humid: 65, soil: 42 },
-  1: { name: "Z1: Ornamental", temp: 26.8, humid: 62, soil: 72 },
-  2: { name: "Z2: Lettuce", temp: 30.2, humid: 58, soil: 38 },
-  3: { name: "Z3: Rose Nursery", temp: 27.5, humid: 68, soil: 65 },
-  4: { name: "Z4: Orchids", temp: 25.4, humid: 75, soil: 85 },
+type SensorReading = {
+  id: string;
+  temperature: number | null;
+  humidity: number | null;
+  soilMoisture: number | null;
+  recordedAt: string;
+  zoneId: string | null;
 };
 
+// Get color classes based on soil moisture value and profile thresholds
+function soilColorClasses(val: number | null | undefined, minMoisture: number = 40, maxMoisture: number = 60) {
+  if (val == null) return { text: "text-gray-400", bar: "bg-gray-300" };
+  if (val >= maxMoisture) return { text: "text-emerald-600", bar: "bg-emerald-500" };
+  if (val < minMoisture)  return { text: "text-rose-600", bar: "bg-rose-500" };
+  return { text: "text-slate-500", bar: "bg-slate-400" };
+}
+
 export default function DashboardPage() {
-  // State
   const [timeFilter, setTimeFilter] = useState<"daily" | "weekly">("daily");
-  const [currentZoneId, setCurrentZoneId] = useState<number>(1);
-  
-  // Pump Control State (only for current zone)
+  const [zones, setZones] = useState<Zone[]>([]);
+  const [profiles, setProfiles] = useState<IrrigationProfile[]>([]);
+  const [currentZoneId, setCurrentZoneId] = useState<string | null>(null);
   const [pumpState, setPumpState] = useState<boolean>(false);
-
-  // Live sensor data from MQTT via SSE stream
   const [liveData, setLiveData] = useState<{ temperature: number | null; humidity: number | null; soilMoisture: number | null } | null>(null);
+  const [historyReadings, setHistoryReadings] = useState<SensorReading[]>([]);
 
-  const currentData = zoneData[currentZoneId];
-  useEffect(() =>{
-    document.title = `BK-IRRIGATION| Dashboard - ${currentData.name}`;
-  })
+  const currentZone = useMemo(() => zones.find(z => z.id === currentZoneId) ?? null, [zones, currentZoneId]);
+
+  // Helper to find profile by ID
+  const findProfile = (profileId: string | undefined): IrrigationProfile | null => {
+    if (!profileId) return null;
+    return profiles.find(p => p.id === profileId) ?? null;
+  };
+
+  useEffect(() => {
+    document.title = `BK-IRRIGATION | Dashboard${currentZone ? ` - ${currentZone.name}` : ""}`;
+  });
+
+  // Fetch zones and profiles on mount
+  useEffect(() => {
+    Promise.all([
+      apiCall<Zone[]>("/api/zones"),
+      apiCall<IrrigationProfile[]>("/api/profiles"),
+    ])
+      .then(([zonData, profData]) => {
+        setZones(zonData);
+        setProfiles(profData);
+        if (zonData.length > 0) setCurrentZoneId(zonData[0].id);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Fetch historical readings when zone or time-filter changes
+  useEffect(() => {
+    if (!currentZoneId) return;
+    const now = new Date();
+    const since = new Date(now.getTime() - (timeFilter === "daily" ? 24 : 7 * 24) * 60 * 60 * 1000);
+    const take = timeFilter === "daily" ? 24 : 56;
+    apiCall<SensorReading[]>(
+      `/api/sensor-readings?zoneId=${encodeURIComponent(currentZoneId)}&since=${since.toISOString()}&take=${take}`
+    )
+      .then(setHistoryReadings)
+      .catch(() => setHistoryReadings([]));
+  }, [currentZoneId, timeFilter]);
 
   // Subscribe to live MQTT sensor stream via SSE
   useEffect(() => {
@@ -88,27 +117,20 @@ export default function DashboardPage() {
     }
   };
 
-  // --- Chart configuration ---
-  const chartLabels = useMemo(() => 
-    timeFilter === "daily"
-        ? ["03:00", "04:00", "05:00", "06:00", "07:00", "08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00"]
-        : ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
-  [timeFilter]);
+  // Build chart data from real historical readings
+  const chartLabels = useMemo(() =>
+    historyReadings.map(r => {
+      const d = new Date(r.recordedAt);
+      return timeFilter === "daily"
+        ? d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+        : d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
+    }),
+    [historyReadings, timeFilter]
+  );
 
-  const tempChartData = useMemo(() => chartLabels.map((_, i) => {
-    const seed = Math.floor(currentData.temp * 100) + i + (timeFilter === "daily" ? 1 : 2);
-    return +(currentData.temp + (pseudoRandom(seed) * 4 - 2)).toFixed(2);
-  }), [chartLabels, currentData.temp, timeFilter]);
-
-  const humidChartData = useMemo(() => chartLabels.map((_, i) => {
-    const seed = Math.floor(currentData.humid * 100) + i + (timeFilter === "daily" ? 3 : 4);
-    return +(currentData.humid + (pseudoRandom(seed) * 6 - 3)).toFixed(2);
-  }), [chartLabels, currentData.humid, timeFilter]);
-
-  const soilChartData = useMemo(() => chartLabels.map((_, i) => {
-    const seed = Math.floor(currentData.soil * 100) + i + (timeFilter === "daily" ? 5 : 6);
-    return +(currentData.soil + (pseudoRandom(seed) * 8 - 4)).toFixed(2);
-  }), [chartLabels, currentData.soil, timeFilter]);
+  const tempChartData  = useMemo(() => historyReadings.map(r => r.temperature),   [historyReadings]);
+  const humidChartData = useMemo(() => historyReadings.map(r => r.humidity),       [historyReadings]);
+  const soilChartData  = useMemo(() => historyReadings.map(r => r.soilMoisture),   [historyReadings]);
 
   const chartOptions = (unit: string) => ({
     responsive: true,
@@ -185,44 +207,37 @@ export default function DashboardPage() {
         {/* Zone Operational Status */}
         <div className="flex-4 bg-white rounded-sm shadow-sm border border-[#e0e0e0]">
           <div className="border-b border-[#eee] py-2 px-4 text-sm font-medium text-[#333]">Zone Soil Moisture Status</div>
-          <div className="grid grid-cols-4 divide-x divide-gray-100">
-            
-            {/* Z1 */}
-            <div onClick={() => setCurrentZoneId(1)} className={`p-3 cursor-pointer transition-colors border-l-4 ${currentZoneId === 1 ? "bg-[#f5f5f5] border-l-[#00695c]" : "border-l-transparent hover:bg-gray-50"}`}>
-              <div className="flex justify-between items-end mb-2">
-                <span className="text-sm font-bold text-slate-700">Z1: Ornamental</span>
-                <span className="text-xs font-bold text-emerald-600">72%</span>
-              </div>
-              <div className="w-full bg-gray-100 h-1 rounded-sm overflow-hidden"><div className="bg-emerald-500 h-full" style={{ width: "72%" }}></div></div>
+          {zones.length === 0 ? (
+            <div className="p-4 text-sm text-gray-400">No zones available.</div>
+          ) : (
+            <div className="grid divide-x divide-gray-100" style={{ gridTemplateColumns: `repeat(${Math.min(zones.length, 4)}, minmax(0, 1fr))` }}>
+              {zones.slice(0, 4).map(zone => {
+                const isActive = zone.id === currentZoneId;
+                const soil = isActive ? (liveData?.soilMoisture ?? null) : null;
+                const profile = findProfile(zone.profileId);
+                const minMoisture = profile?.minMoisture ?? 40;
+                const maxMoisture = profile?.maxMoisture ?? 60;
+                const { text, bar } = soilColorClasses(soil, minMoisture, maxMoisture);
+                return (
+                  <div
+                    key={zone.id}
+                    onClick={() => setCurrentZoneId(zone.id)}
+                    className={`p-3 cursor-pointer transition-colors border-l-4 ${isActive ? "bg-[#f5f5f5] border-l-[#00695c]" : "border-l-transparent hover:bg-gray-50"}`}
+                  >
+                    <div className="flex justify-between items-end mb-2">
+                      <span className="text-sm font-bold text-slate-700 truncate mr-1">{zone.name}</span>
+                      <span className={`text-xs font-bold shrink-0 ${text}`}>
+                        {soil != null ? `${soil.toFixed(0)}%` : "--"}
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-100 h-1 rounded-sm overflow-hidden">
+                      <div className={`${bar} h-full`} style={{ width: soil != null ? `${Math.min(100, soil)}%` : "0%" }}></div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-
-            {/* Z2 */}
-            <div onClick={() => setCurrentZoneId(2)} className={`p-3 cursor-pointer transition-colors border-l-4 ${currentZoneId === 2 ? "bg-[#f5f5f5] border-l-[#00695c]" : "border-l-transparent hover:bg-gray-50"}`}>
-              <div className="flex justify-between items-end mb-2">
-                <span className="text-sm font-bold text-slate-700">Z2: Lettuce</span>
-                <span className="text-xs font-bold text-rose-600">38%</span>
-              </div>
-              <div className="w-full bg-gray-100 h-1 rounded-sm overflow-hidden"><div className="bg-rose-500 h-full" style={{ width: "38%" }}></div></div>
-            </div>
-
-            {/* Z3 */}
-            <div onClick={() => setCurrentZoneId(3)} className={`p-3 cursor-pointer transition-colors border-l-4 ${currentZoneId === 3 ? "bg-[#f5f5f5] border-l-[#00695c]" : "border-l-transparent hover:bg-gray-50"}`}>
-              <div className="flex justify-between items-end mb-2">
-                <span className="text-sm font-bold text-slate-700">Z3: Rose Nursery</span>
-                <span className="text-xs font-bold text-slate-400">65%</span>
-              </div>
-              <div className="w-full bg-gray-100 h-1 rounded-sm overflow-hidden"><div className="bg-gray-400 h-full" style={{ width: "65%" }}></div></div>
-            </div>
-
-            {/* Z4 */}
-            <div onClick={() => setCurrentZoneId(4)} className={`p-3 cursor-pointer transition-colors border-l-4 ${currentZoneId === 4 ? "bg-[#f5f5f5] border-l-[#00695c]" : "border-l-transparent hover:bg-gray-50"}`}>
-              <div className="flex justify-between items-end mb-2">
-                <span className="text-sm font-bold text-slate-700">Z4: Rose Nursery</span>
-                <span className="text-xs font-bold text-slate-400">65%</span>
-              </div>
-              <div className="w-full bg-gray-100 h-1 rounded-sm overflow-hidden"><div className="bg-gray-400 h-full" style={{ width: "65%" }}></div></div>
-            </div>
-          </div>
+          )}
         </div>
       </div>
 
@@ -237,7 +252,9 @@ export default function DashboardPage() {
               <Thermometer className="w-6 h-6 text-orange-500" />
               <span className="text-sm color-[#666] font-medium uppercase">Temperature <span className="text-xs block normal-case font-normal text-gray-400">Last update just now</span></span>
             </div>
-            <div className="text-[32px] font-normal text-orange-600">{(liveData?.temperature ?? currentData.temp).toFixed(1)} <span className="text-lg">°C</span></div>
+            <div className="text-[32px] font-normal text-orange-600">
+              {liveData?.temperature != null ? liveData.temperature.toFixed(1) : "--"} <span className="text-lg">°C</span>
+            </div>
           </div>
           
           <div className="flex-1 bg-white rounded-sm shadow-sm border border-[#e0e0e0] p-4 mb-0">
@@ -245,7 +262,9 @@ export default function DashboardPage() {
               <Droplets className="w-6 h-6 text-blue-500" />
               <span className="text-sm color-[#666] font-medium uppercase">Humidity <span className="text-xs block normal-case font-normal text-gray-400">Last update just now</span></span>
             </div>
-            <div className="text-[32px] font-normal text-blue-600">{(liveData?.humidity ?? currentData.humid).toFixed(0)} <span className="text-lg">%</span></div>
+            <div className="text-[32px] font-normal text-blue-600">
+              {liveData?.humidity != null ? liveData.humidity.toFixed(0) : "--"} <span className="text-lg">%</span>
+            </div>
           </div>
           
           <div className="flex-1 bg-white rounded-sm shadow-sm border border-[#e0e0e0] p-4 mb-0">
@@ -253,7 +272,9 @@ export default function DashboardPage() {
               <Sprout className="w-6 h-6 text-emerald-500" />
               <span className="text-sm color-[#666] font-medium uppercase">Soil Moisture <span className="text-xs block normal-case font-normal text-gray-400">Last update just now</span></span>
             </div>
-            <div className="text-[32px] font-normal text-emerald-600">{(liveData?.soilMoisture ?? currentData.soil).toFixed(0)} <span className="text-lg">%</span></div>
+            <div className="text-[32px] font-normal text-emerald-600">
+              {liveData?.soilMoisture != null ? liveData.soilMoisture.toFixed(0) : "--"} <span className="text-lg">%</span>
+            </div>
           </div>
         </div>
 
