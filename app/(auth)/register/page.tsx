@@ -2,14 +2,20 @@
 // Full-screen overlay with email/password/confirm form and link back to login
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Sprout, Loader2 } from "lucide-react";
 import { apiCall, ApiError } from "@/lib/api";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { login } = useAuth();
+
+  useEffect(() => {
+    document.title = "BK-IRRIGATION | Sign Up";
+  }, []);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -32,10 +38,12 @@ export default function RegisterPage() {
 
     setLoading(true);
     try {
-      await apiCall("/api/auth/register", {
+      const response = await apiCall<{ userId: string; email: string }>("/api/auth/register", {
         method: "POST",
         body: JSON.stringify({ email, password }),
       });
+      // Update auth context with registered user
+      login(response);
       // Auto-logged in after registration → redirect to dashboard
       router.push("/dashboard");
     } catch (err) {

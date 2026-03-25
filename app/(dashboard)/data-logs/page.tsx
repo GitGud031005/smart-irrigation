@@ -24,7 +24,7 @@ const ZONES = [
     { id: 4, name: "Z4: Orchids" },
 ];
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 15;
 
 // ─── Status thresholds (frontend only — no status field in DB) ───────────────
 
@@ -68,6 +68,10 @@ export default function DataLogsPage() {
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
     const [liveConnected, setLiveConnected] = useState<boolean>(false);
+
+    useEffect(() => {
+        document.title = "BK-IRRIGATION | Data Logs";
+    }, []);
 
     // On mount: POST sync (pull new data from Adafruit → DB), then GET history from DB
     useEffect(() => {

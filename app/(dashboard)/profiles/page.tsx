@@ -1,20 +1,12 @@
 ﻿"use client";
 
-import { useState, useMemo } from "react";
-import { Plus, Settings, Trash2, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
+import { Plus, Settings, Trash2, X, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import type { IrrigationProfile as Profile } from "@/models/irrigation-profile";
 import { IrrigationMode } from "@/models/irrigation-profile";
+import { apiCall } from "@/lib/api";
 
-// --- Mock Data ---
-
-const MOCK_PROFILES: Profile[] = [
-  { id: "a3f1c9f2-4b2e-4d7a-9a6d-1b2c3d4e5f61", name: "Default — Ornamental", minMoisture: 40, maxMoisture: 80, mode: IrrigationMode.AUTO },
-  { id: "b41f2d0a-5c3f-4e8b-8b7e-2c3d4e5f6a72", name: "Leafy Vegetables",     minMoisture: 50, maxMoisture: 90, mode: IrrigationMode.AUTO },
-  { id: "c52e3a1b-6d4f-5f9c-7c8f-3d4e5f6a7b83", name: "Rose Nursery",          minMoisture: 45, maxMoisture: 75, mode: IrrigationMode.AUTO },
-  { id: "d6a4b2c5-7e5f-6a0d-9d0a-4e5f6a7b8c94", name: "Tropical — Orchids",   minMoisture: 60, maxMoisture: 95, mode: IrrigationMode.AUTO },
-];
-
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 15;
 
 const MODE_BADGE: Record<IrrigationMode, string> = {
   [IrrigationMode.AUTO]:   "bg-emerald-100 text-emerald-700",
@@ -218,17 +210,52 @@ function AddProfileModal({ onClose, onAdd }: AddProfileModalProps) {
 // --- Page ---
 
 export default function ProfilesPage() {
-  const [profiles,        setProfiles]        = useState<Profile[]>(MOCK_PROFILES);
+  const [profiles,        setProfiles]        = useState<Profile[]>([]);
   const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
   const [showAddModal,    setShowAddModal]    = useState(false);
+  const [loading,         setLoading]         = useState(true);
+  const [error,           setError]           = useState<string | null>(null);
   const [page,            setPage]            = useState(1);
+
+  useEffect(() => {
+    document.title = "BK-IRRIGATION | Profiles";
+  }, []);
+
+  const loadProfiles = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await apiCall<Profile[]>('/api/profiles');
+      setProfiles(data);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load profiles');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { loadProfiles(); }, []);
 
   const totalPages = Math.max(1, Math.ceil(profiles.length / PAGE_SIZE));
   const pageData   = useMemo(() => profiles.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [profiles, page]);
 
-  const handleSave   = (id: string, data: Partial<Profile>) => setProfiles((prev) => prev.map((p) => (p.id === id ? { ...p, ...data } : p)));
-  const handleDelete = (id: string) => setProfiles((prev) => prev.filter((p) => p.id !== id));
-  const handleAdd    = (data: Omit<Profile, "id">) => setProfiles((prev) => [...prev, { ...data, id: `prof-${Date.now()}` }]);
+  const handleSave = (id: string, data: Partial<Profile>) => {
+    setProfiles(prev => prev.map(p => p.id === id ? { ...p, ...data } : p));
+    apiCall(`/api/profiles/${id}`, { method: 'PUT', body: JSON.stringify(data) })
+      .catch(() => { loadProfiles(); });
+  };
+
+  const handleDelete = (id: string) => {
+    setProfiles(prev => prev.filter(p => p.id !== id));
+    apiCall(`/api/profiles/${id}`, { method: 'DELETE' })
+      .catch(() => { loadProfiles(); });
+  };
+
+  const handleAdd = (data: Omit<Profile, 'id'>) => {
+    apiCall<Profile>('/api/profiles', { method: 'POST', body: JSON.stringify(data) })
+      .then(newProfile => setProfiles(prev => [...prev, newProfile]))
+      .catch(() => {});
+  };
 
   return (
     <div className="h-full flex flex-col text-[#333] font-sans">
@@ -249,6 +276,17 @@ export default function ProfilesPage() {
 
       {/* Table Card */}
       <div className="flex-1 min-h-0 flex flex-col bg-white rounded-sm shadow-sm border border-[#e0e0e0]">
+        {loading && (
+          <div className="flex-1 flex items-center justify-center gap-2 text-gray-400 text-sm">
+            <RefreshCw className="w-4 h-4 animate-spin" /> Loading profiles…
+          </div>
+        )}
+        {!loading && error && (
+          <div className="flex-1 flex items-center justify-center text-red-500 text-sm">
+            Error: {error}
+          </div>
+        )}
+        {!loading && !error && (
         <div className="flex-1 overflow-y-auto">
           <table className="w-full text-[12px]">
             <thead className="sticky top-0 bg-[#f9f9f9] border-b border-[#e8e8e8] z-10">
@@ -294,6 +332,7 @@ export default function ProfilesPage() {
             </tbody>
           </table>
         </div>
+        )}
 
         {/* Pagination Footer */}
         <div className="shrink-0 border-t border-[#e8e8e8] px-4 py-2.5 flex items-center justify-between bg-[#f9f9f9]">

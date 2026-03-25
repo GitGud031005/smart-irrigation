@@ -11,6 +11,10 @@ export async function getUserByEmail(email: string): Promise<User | null> {
 	return prisma.user.findUnique({ where: { email } })
 }
 
+export async function getUserById(id: string): Promise<User | null> {
+	return prisma.user.findUnique({ where: { id } })
+}
+
 export async function updateUserPassword(id: string, newPassword: string): Promise<User> {
 	const hash = await bcrypt.hash(newPassword, 10)
 	return prisma.user.update({ where: { id }, data: { passwordHash: hash } })

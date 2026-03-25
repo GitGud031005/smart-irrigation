@@ -1,44 +1,14 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { Plus, Settings, Trash2, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
+import { Plus, Settings, Trash2, X, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import type { Zone } from "@/models/zone";
 import type { IrrigationProfile as Profile } from "@/models/irrigation-profile";
 import type { Schedule } from "@/models/schedule";
-import { IrrigationMode } from "@/models/irrigation-profile";
+import { apiCall } from "@/lib/api";
 
 
-// ─── Mock Data ────────────────────────────────────────────────────────────────
-
-const MOCK_PROFILES: Profile[] = [
-  { id: "prof-1", name: "Default — Ornamental", minMoisture: 40, maxMoisture: 80, mode: IrrigationMode.AUTO },
-  { id: "prof-2", name: "Leafy Vegetables",     minMoisture: 50, maxMoisture: 90, mode: IrrigationMode.AUTO },
-  { id: "prof-3", name: "Rose Nursery",          minMoisture: 45, maxMoisture: 75, mode: IrrigationMode.AUTO },
-  { id: "prof-4", name: "Tropical — Orchids",   minMoisture: 60, maxMoisture: 95, mode: IrrigationMode.AUTO },
-];
-
-const MOCK_SCHEDULES: Schedule[] = [
-  { id: "e7b5c3d6-8f6a-4b1e-8b1c-5f6a7b8c9d05", name: "Morning & Evening",  timeSlots: [{ id: "1a1b1c1d-0001-4a01-9001-000102030405", startTime: "06:00", days: ["Monday","Wednesday","Friday"], duration: 300, scheduleId: "e7b5c3d6-8f6a-4b1e-8b1c-5f6a7b8c9d05" }] },
-  { id: "f8c6d4e7-9a7b-4c2f-9c2d-6a7b8c9d0e16", name: "Daily Triple",        timeSlots: [{ id: "2a2b2c2d-0002-4b02-9002-000203040506", startTime: "07:00", days: ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"], duration: 120, scheduleId: "f8c6d4e7-9a7b-4c2f-9c2d-6a7b8c9d0e16" }] },
-  { id: "a9d7e5f8-1b8c-4d3a-0d3e-7b8c9d0e1f27", name: "Weekend Soak",        timeSlots: [{ id: "3a3b3c3d-0003-4c03-9003-000304050607", startTime: "08:00", days: ["Saturday","Sunday"], duration: 600, scheduleId: "a9d7e5f8-1b8c-4d3a-0d3e-7b8c9d0e1f27" }] },
-  { id: "b0e8f6a9-2c9d-4e4b-1e4f-8c9d0e1f2a38", name: "Early Morning Only",  timeSlots: [{ id: "4a4b4c4d-0004-4d04-9004-000405060708", startTime: "05:30", days: ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"], duration: 180, scheduleId: "b0e8f6a9-2c9d-4e4b-1e4f-8c9d0e1f2a38" }] },
-];
-
-const MOCK_ZONES: Zone[] = [
-  { id: "d1e2f3a4-1111-4b2c-9d3e-1f2a3b4c5d61", name: "Ornamental Garden", profileId: "a3f1c9f2-4b2e-4d7a-9a6d-1b2c3d4e5f61", scheduleId: "e7b5c3d6-8f6a-4b1e-8b1c-5f6a7b8c9d05", userId: "01234567-89ab-4cde-9fab-0123456789ab" },
-  { id: "e2f3a4b5-2222-4c3d-9e4f-2a3b4c5d6e72", name: "Lettuce Beds",       profileId: "b41f2d0a-5c3f-4e8b-8b7e-2c3d4e5f6a72", scheduleId: "f8c6d4e7-9a7b-4c2f-9c2d-6a7b8c9d0e16", userId: "01234567-89ab-4cde-9fab-0123456789ab" },
-  { id: "f3a4b5c6-3333-4d4e-9f5a-3b4c5d6e7f83", name: "Rose Nursery",       profileId: "c52e3a1b-6d4f-5f9c-7c8f-3d4e5f6a7b83", scheduleId: "e7b5c3d6-8f6a-4b1e-8b1c-5f6a7b8c9d05", userId: "01234567-89ab-4cde-9fab-0123456789ab" },
-  { id: "a4b5c6d7-4444-4e5f-9a6b-4c5d6e7f8094", name: "Orchid House",       profileId: "d6a4b2c5-7e5f-6a0d-9d0a-4e5f6a7b8c94", scheduleId: "a9d7e5f8-1b8c-4d3a-0d3e-7b8c9d0e1f27", userId: "01234567-89ab-4cde-9fab-0123456789ab" },
-];
-
-const MOCK_DEVICE_COUNTS: Record<string, number> = {
-  "d1e2f3a4-1111-4b2c-9d3e-1f2a3b4c5d61": 3,
-  "e2f3a4b5-2222-4c3d-9e4f-2a3b4c5d6e72": 2,
-  "f3a4b5c6-3333-4d4e-9f5a-3b4c5d6e7f83": 2,
-  "a4b5c6d7-4444-4e5f-9a6b-4c5d6e7f8094": 3,
-};
-
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 15;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -273,13 +243,45 @@ function AddZoneModal({ profiles, schedules, onClose, onAdd }: AddZoneModalProps
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ZonesPage() {
-  const [zones,        setZones]        = useState<Zone[]>(MOCK_ZONES);
-  const [profiles]                      = useState<Profile[]>(MOCK_PROFILES);
-  const [schedules]                     = useState<Schedule[]>(MOCK_SCHEDULES);
-  const [deviceCounts]                  = useState<Record<string, number>>(MOCK_DEVICE_COUNTS);
+  const [zones,        setZones]        = useState<Zone[]>([]);
+  const [profiles,     setProfiles]     = useState<Profile[]>([]);
+  const [schedules,    setSchedules]    = useState<Schedule[]>([]);
+  const [deviceCounts, setDeviceCounts] = useState<Record<string, number>>({});
+  const [loading,      setLoading]      = useState(true);
+  const [error,        setError]        = useState<string | null>(null);
   const [selectedZone, setSelectedZone] = useState<Zone | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [page,         setPage]         = useState(1);
+
+  useEffect(() => {
+    document.title = "BK-IRRIGATION | Zones";
+  }, []);
+
+  const loadAll = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [zonesData, profilesData, schedulesData, devicesData] = await Promise.all([
+        apiCall<Zone[]>('/api/zones'),
+        apiCall<Profile[]>('/api/profiles'),
+        apiCall<Schedule[]>('/api/schedules'),
+        apiCall<{ id: string; zoneId: string | null }[]>('/api/devices'),
+      ]);
+      setZones(zonesData);
+      setProfiles(profilesData);
+      setSchedules(schedulesData);
+      // Count devices per zone
+      const counts: Record<string, number> = {};
+      devicesData.forEach(d => { if (d.zoneId) counts[d.zoneId] = (counts[d.zoneId] ?? 0) + 1; });
+      setDeviceCounts(counts);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { loadAll(); }, []);
 
   const totalPages = Math.max(1, Math.ceil(zones.length / PAGE_SIZE));
   const pageData   = useMemo(
@@ -290,14 +292,23 @@ export default function ZonesPage() {
   const findProfile  = (id?: string) => profiles.find((p) => p.id === id);
   const findSchedule = (id?: string) => schedules.find((s) => s.id === id);
 
-  const handleSave = (id: string, data: Partial<Zone>) =>
-    setZones((prev) => prev.map((z) => (z.id === id ? { ...z, ...data } : z)));
+  const handleSave = (id: string, data: Partial<Zone>) => {
+    setZones(prev => prev.map(z => z.id === id ? { ...z, ...data } : z));
+    apiCall(`/api/zones/${id}`, { method: 'PUT', body: JSON.stringify(data) })
+      .catch(() => { loadAll(); });
+  };
 
-  const handleDelete = (id: string) =>
-    setZones((prev) => prev.filter((z) => z.id !== id));
+  const handleDelete = (id: string) => {
+    setZones(prev => prev.filter(z => z.id !== id));
+    apiCall(`/api/zones/${id}`, { method: 'DELETE' })
+      .catch(() => { loadAll(); });
+  };
 
-  const handleAdd = (data: Omit<Zone, "id">) =>
-    setZones((prev) => [...prev, { ...data, id: `zone-${Date.now()}` }]);
+  const handleAdd = (data: Omit<Zone, 'id'>) => {
+    apiCall<Zone>('/api/zones', { method: 'POST', body: JSON.stringify(data) })
+      .then(newZone => setZones(prev => [...prev, newZone]))
+      .catch(() => {});
+  };
 
   return (
     <div className="h-full flex flex-col text-[#333] font-sans">
@@ -318,6 +329,17 @@ export default function ZonesPage() {
 
       {/* Table Card */}
       <div className="flex-1 min-h-0 flex flex-col bg-white rounded-sm shadow-sm border border-[#e0e0e0]">
+        {loading && (
+          <div className="flex-1 flex items-center justify-center gap-2 text-gray-400 text-sm">
+            <RefreshCw className="w-4 h-4 animate-spin" /> Loading zones…
+          </div>
+        )}
+        {!loading && error && (
+          <div className="flex-1 flex items-center justify-center text-red-500 text-sm">
+            Error: {error}
+          </div>
+        )}
+        {!loading && !error && (
         <div className="flex-1 overflow-y-auto">
           <table className="w-full text-[12px]" style={{ tableLayout: "fixed" }}>
             <thead className="sticky top-0 bg-[#f9f9f9] border-b border-[#e8e8e8] z-10">
@@ -369,6 +391,7 @@ export default function ZonesPage() {
             </tbody>
           </table>
         </div>
+        )}
 
         {/* Pagination Footer */}
         <div className="shrink-0 border-t border-[#e8e8e8] px-4 py-2.5 flex items-center justify-between bg-[#f9f9f9]">
