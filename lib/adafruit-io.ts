@@ -4,28 +4,20 @@
 
 const AIO_BASE_URL = "https://io.adafruit.com/api/v2";
 
-function getConfig() {
-  const username = process.env.ADAFRUIT_IO_USERNAME;
-  const key = process.env.ADAFRUIT_IO_KEY;
-  if (!username || !key) {
-    throw new Error(
-      "Missing ADAFRUIT_IO_USERNAME or ADAFRUIT_IO_KEY in environment variables"
-    );
-  }
-  return { username, key };
+export interface AIOCredentials {
+  username: string;
+  key: string;
 }
 
-function headers() {
-  const { key } = getConfig();
+function makeHeaders(credentials: AIOCredentials) {
   return {
-    "X-AIO-Key": key,
+    "X-AIO-Key": credentials.key,
     "Content-Type": "application/json",
   };
 }
 
-function feedUrl(feedKey: string) {
-  const { username } = getConfig();
-  return `${AIO_BASE_URL}/${username}/feeds/${feedKey}`;
+function feedUrl(feedKey: string, credentials: AIOCredentials) {
+  return `${AIO_BASE_URL}/${credentials.username}/feeds/${feedKey}`;
 }
 
 // ─── Types ───────────────────────────────────────────────────────────
@@ -57,18 +49,17 @@ export interface AIOFeed {
 // ─── Feed operations ─────────────────────────────────────────────────
 
 /** Get all feeds for the authenticated user */
-export async function getAllFeeds(): Promise<AIOFeed[]> {
-  const { username } = getConfig();
-  const res = await fetch(`${AIO_BASE_URL}/${username}/feeds`, {
-    headers: headers(),
+export async function getAllFeeds(credentials: AIOCredentials): Promise<AIOFeed[]> {
+  const res = await fetch(`${AIO_BASE_URL}/${credentials.username}/feeds`, {
+    headers: makeHeaders(credentials),
   });
   if (!res.ok) throw new Error(`Adafruit IO error ${res.status}: ${await res.text()}`);
   return res.json();
 }
 
 /** Get feed details by key */
-export async function getFeed(feedKey: string): Promise<AIOFeed> {
-  const res = await fetch(feedUrl(feedKey), { headers: headers() });
+export async function getFeed(feedKey: string, credentials: AIOCredentials): Promise<AIOFeed> {
+  const res = await fetch(feedUrl(feedKey, credentials), { headers: makeHeaders(credentials) });
   if (!res.ok) throw new Error(`Adafruit IO error ${res.status}: ${await res.text()}`);
   return res.json();
 }
@@ -76,9 +67,9 @@ export async function getFeed(feedKey: string): Promise<AIOFeed> {
 // ─── Data operations ─────────────────────────────────────────────────
 
 /** Get the latest data point from a feed */
-export async function getLastData(feedKey: string): Promise<AIODataPoint> {
-  const res = await fetch(`${feedUrl(feedKey)}/data/last`, {
-    headers: headers(),
+export async function getLastData(feedKey: string, credentials: AIOCredentials): Promise<AIODataPoint> {
+  const res = await fetch(`${feedUrl(feedKey, credentials)}/data/last`, {
+    headers: makeHeaders(credentials),
   });
   if (!res.ok) throw new Error(`Adafruit IO error ${res.status}: ${await res.text()}`);
   return res.json();
@@ -87,18 +78,19 @@ export async function getLastData(feedKey: string): Promise<AIODataPoint> {
 /** Get historical data from a feed */
 export async function getFeedData(
   feedKey: string,
+  credentials: AIOCredentials,
   params?: {
     limit?: number;
     start_time?: string;
     end_time?: string;
   }
 ): Promise<AIODataPoint[]> {
-  const url = new URL(`${feedUrl(feedKey)}/data`);
+  const url = new URL(`${feedUrl(feedKey, credentials)}/data`);
   if (params?.limit) url.searchParams.set("limit", String(params.limit));
   if (params?.start_time) url.searchParams.set("start_time", params.start_time);
   if (params?.end_time) url.searchParams.set("end_time", params.end_time);
 
-  const res = await fetch(url.toString(), { headers: headers() });
+  const res = await fetch(url.toString(), { headers: makeHeaders(credentials) });
   if (!res.ok) throw new Error(`Adafruit IO error ${res.status}: ${await res.text()}`);
   return res.json();
 }
@@ -106,11 +98,12 @@ export async function getFeedData(
 /** Send a data point to a feed (used for control — e.g. turning pump ON/OFF) */
 export async function sendData(
   feedKey: string,
-  value: string
+  value: string,
+  credentials: AIOCredentials
 ): Promise<AIODataPoint> {
-  const res = await fetch(`${feedUrl(feedKey)}/data`, {
+  const res = await fetch(`${feedUrl(feedKey, credentials)}/data`, {
     method: "POST",
-    headers: headers(),
+    headers: makeHeaders(credentials),
     body: JSON.stringify({ value }),
   });
   if (!res.ok) throw new Error(`Adafruit IO error ${res.status}: ${await res.text()}`);
@@ -127,11 +120,11 @@ const FEED_KEYS = {
 };
 
 /** Get latest sensor readings from all feeds at once */
-export async function getLatestSensorData() {
+export async function getLatestSensorData(credentials: AIOCredentials) {
   const [soilMoisture, temperature, humidity] = await Promise.all([
-    getLastData(FEED_KEYS.soilMoisture()),
-    getLastData(FEED_KEYS.temperature()),
-    getLastData(FEED_KEYS.humidity()),
+    getLastData(FEED_KEYS.soilMoisture(), credentials),
+    getLastData(FEED_KEYS.temperature(), credentials),
+    getLastData(FEED_KEYS.humidity(), credentials),
   ]);
 
   return {
@@ -142,13 +135,13 @@ export async function getLatestSensorData() {
 }
 
 /** Turn the pump ON or OFF via Adafruit IO */
-export async function controlPump(action: "1" | "0") {
-  return sendData(FEED_KEYS.pump(), action);
+export async function controlPump(action: "1" | "0", credentials: AIOCredentials) {
+  return sendData(FEED_KEYS.pump(), action, credentials);
 }
 
 /** Get pump status (last value) */
-export async function getPumpStatus() {
-  const data = await getLastData(FEED_KEYS.pump());
+export async function getPumpStatus(credentials: AIOCredentials) {
+  const data = await getLastData(FEED_KEYS.pump(), credentials);
   return {
     status: data.value as "1" | "0",
     updatedAt: data.created_at,

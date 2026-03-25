@@ -13,9 +13,11 @@ datasource db {
 }
 
 model User {
-  id           String  @id @default(uuid()) @map("user_id")
-  email        String  @unique
-  passwordHash String  @map("password_hash")
+  id               String  @id @default(uuid()) @map("user_id")
+  email            String  @unique
+  passwordHash     String  @map("password_hash")
+  adafruitUsername String  @default("") @map("adafruit_username")
+  adafruitKey      String  @default("") @map("adafruit_key")
 
   zones Zone[]
 

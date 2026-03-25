@@ -2,8 +2,21 @@ import { NextRequest, NextResponse } from 'next/server'
 import { controlPump } from '@/lib/adafruit-io'
 import { createIrrigationEvent, queryIrrigationEvents, updateIrrigationEvent } from '@/services/irrigation-service'
 import { toJsonSafe } from '@/lib/utils'
+import { verifyToken, COOKIE_NAME } from '@/lib/auth'
+import { getUserById } from '@/services/auth-service'
 
 export async function POST(request: NextRequest) {
+  const token = request.cookies.get(COOKIE_NAME)?.value
+  if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const payload = await verifyToken(token)
+  if (!payload) return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
+
+  const dbUser = await getUserById(payload.userId)
+  if (!dbUser || !dbUser.adafruitUsername || !dbUser.adafruitKey) {
+    return NextResponse.json({ error: 'Adafruit IO credentials not configured. Please set them in the header settings.' }, { status: 422 })
+  }
+  const credentials = { username: dbUser.adafruitUsername, key: dbUser.adafruitKey }
+
   let body: { action?: string }
   try {
     body = await request.json()
@@ -19,14 +32,14 @@ export async function POST(request: NextRequest) {
   try {
     if (action === 'start') {
       // Control pump ON via Adafruit IO
-      await controlPump('1')
+      await controlPump('1', credentials)
 
       // Record the event in DB (no zone, since zones aren't wired yet)
       const event = await createIrrigationEvent({ startTime: new Date() })
       return NextResponse.json(toJsonSafe({ success: true, event }), { status: 201 })
     } else {
       // Control pump OFF via Adafruit IO
-      await controlPump('0')
+      await controlPump('0', credentials)
 
       // Close the most recent open irrigation event
       const openEvents = await queryIrrigationEvents({ take: 10 })

@@ -4,9 +4,11 @@
 // - Whenever any metric updates, a new reading is emitted using the current buffer values.
 // - recordedAt is always the timestamp of the most recent event that triggered the emission.
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getFeedData } from "@/lib/adafruit-io";
 import { createSensorReading, getLatestSensorReading,  } from "@/services/sensor-service";
+import { verifyToken, COOKIE_NAME } from "@/lib/auth";
+import { getUserById } from "@/services/auth-service";
 
 interface AdafruitDatum {
   value: string;
@@ -21,7 +23,18 @@ interface BufferState {
   humidity: number | null;
 }
 
-export async function POST() {
+export async function POST(request: NextRequest) {
+  const token = request.cookies.get(COOKIE_NAME)?.value
+  if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const payload = await verifyToken(token)
+  if (!payload) return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
+
+  const dbUser = await getUserById(payload.userId)
+  if (!dbUser || !dbUser.adafruitUsername || !dbUser.adafruitKey) {
+    return NextResponse.json({ error: 'Adafruit IO credentials not configured. Please set them in the header settings.' }, { status: 422 })
+  }
+  const credentials = { username: dbUser.adafruitUsername, key: dbUser.adafruitKey }
+
   try {
     // Use the last stored reading as the lower bound for dedup
     const lastStored = await getLatestSensorReading().then(r => r?.recordedAt ? new Date(r.recordedAt) : null);
@@ -29,9 +42,9 @@ export async function POST() {
     // Fetch new data from all 3 feeds since the last stored reading
     const startTime = lastStored?.toISOString();
     const [soilData, tempData, humData] = await Promise.all([
-      getFeedData(process.env.ADAFRUIT_IO_FEED_SOIL_MOISTURE || "soil-moisture", startTime ? { start_time: startTime } : undefined),
-      getFeedData(process.env.ADAFRUIT_IO_FEED_TEMPERATURE || "temperature", startTime ? { start_time: startTime } : undefined),
-      getFeedData(process.env.ADAFRUIT_IO_FEED_HUMIDITY || "humidity", startTime ? { start_time: startTime } : undefined),
+      getFeedData(process.env.ADAFRUIT_IO_FEED_SOIL_MOISTURE || "soil-moisture", credentials, startTime ? { start_time: startTime } : undefined),
+      getFeedData(process.env.ADAFRUIT_IO_FEED_TEMPERATURE || "temperature", credentials, startTime ? { start_time: startTime } : undefined),
+      getFeedData(process.env.ADAFRUIT_IO_FEED_HUMIDITY || "humidity", credentials, startTime ? { start_time: startTime } : undefined),
     ]);
 
     // Tag each datum with its metric, parse value, and filter out already-stored or invalid entries
