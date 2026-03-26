@@ -27,7 +27,7 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
     try {
-      const response = await apiCall<{ userId: string; email: string }>("/api/auth/login", {
+      const response = await apiCall<{ userId: string; email: string; adafruitUsername: string; adafruitKey: string }>("/api/auth/login", {
         method: "POST",
         body: JSON.stringify({ email, password }),
       });
