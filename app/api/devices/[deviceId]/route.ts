@@ -1,6 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server'
 import { getDevice, updateDevice, deleteDevice } from '@/services/device-service'
+import { createIrrigationEvent, updateIrrigationEvent, getLatestOpenIrrigationEvent } from '@/services/irrigation-service'
+import { controlPump } from '@/lib/adafruit-io'
+import { verifyToken, COOKIE_NAME } from '@/lib/auth'
+import { getUserById } from '@/services/auth-service'
 import { toJsonSafe } from '@/lib/utils'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ deviceId: string }> }) {
@@ -19,9 +23,68 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 	const { deviceId } = await params
 	let body: any
 	try { body = await request.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
+
+	const device = await getDevice(deviceId)
+	if (!device) return NextResponse.json({ error: 'Device not found' }, { status: 404 })
+
+	// Special case: relay device with status control
+	if (body.status && device.deviceType === 'RELAY_MODULE' && (body.status === 'ACTIVE' || body.status === 'OFFLINE')) {
+		// Map status to pump action: ACTIVE → "1", OFFLINE → "0"
+		const action = body.status === 'ACTIVE' ? '1' : '0'
+
+		// Auth
+		const token = request.cookies.get(COOKIE_NAME)?.value
+		if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+		const payload = await verifyToken(token)
+		if (!payload) return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
+		const dbUser = await getUserById(payload.userId)
+		if (!dbUser || !dbUser.adafruitUsername || !dbUser.adafruitKey) {
+			return NextResponse.json({ error: 'Adafruit IO credentials not configured' }, { status: 422 })
+		}
+		const credentials = { username: dbUser.adafruitUsername, key: dbUser.adafruitKey }
+
+		if (!device.feedKey) {
+			return NextResponse.json({ error: 'Device has no feedKey configured' }, { status: 422 })
+		}
+
+		try {
+			const adafruitResponse = await controlPump(action, credentials, device.feedKey)
+
+			const now = new Date()
+			const updatedDevice = await updateDevice(deviceId, {
+				status: body.status,
+				lastActiveAt: now,
+			})
+
+			let event = null
+			if (action === '1') {
+				event = await createIrrigationEvent({ startTime: now, zoneId: device.zoneId ?? undefined })
+			} else {
+				const open = await getLatestOpenIrrigationEvent()
+				if (open) {
+					const duration = Math.round((now.getTime() - open.startTime.getTime()) / 1000)
+					event = await updateIrrigationEvent(open.id, { endTime: now, duration })
+				}
+			}
+
+			return NextResponse.json({
+				success: true,
+				pump: action,
+				device: toJsonSafe(updatedDevice),
+				event: toJsonSafe(event),
+				adafruitResponse,
+			})
+		} catch (error) {
+			const message = error instanceof Error ? error.message : 'Unknown error'
+			return NextResponse.json({ error: message }, { status: 502 })
+		}
+	}
+
+	// Normal device update (no pump control)
 	try {
 		const d = await updateDevice(deviceId, {
-			deviceType: body.deviceType,
+			deviceType: body.deviceType ?? undefined,
+			feedKey: body.feedKey ?? undefined,
 			zoneId: body.zoneId,
 			status: body.status,
 		})

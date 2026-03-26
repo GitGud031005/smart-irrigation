@@ -110,21 +110,16 @@ export async function sendData(
   return res.json();
 }
 
-// ─── Convenience helpers for this project's feeds ────────────────────
-
-const FEED_KEYS = {
-  soilMoisture: () => process.env.ADAFRUIT_IO_FEED_SOIL_MOISTURE || "soil-moisture",
-  temperature: () => process.env.ADAFRUIT_IO_FEED_TEMPERATURE || "temperature",
-  humidity: () => process.env.ADAFRUIT_IO_FEED_HUMIDITY || "humidity",
-  pump: () => process.env.ADAFRUIT_IO_FEED_PUMP || "pump",
-};
-
-/** Get latest sensor readings from all feeds at once */
-export async function getLatestSensorData(credentials: AIOCredentials) {
+/** Get latest sensor readings from all feeds at once.
+ * feedKeys for all metrics must be provided from device records. */
+export async function getLatestSensorData(
+  credentials: AIOCredentials,
+  feedKeys: { soilMoisture: string; temperature: string; humidity: string }
+) {
   const [soilMoisture, temperature, humidity] = await Promise.all([
-    getLastData(FEED_KEYS.soilMoisture(), credentials),
-    getLastData(FEED_KEYS.temperature(), credentials),
-    getLastData(FEED_KEYS.humidity(), credentials),
+    getLastData(feedKeys.soilMoisture, credentials),
+    getLastData(feedKeys.temperature, credentials),
+    getLastData(feedKeys.humidity, credentials),
   ]);
 
   return {
@@ -134,16 +129,8 @@ export async function getLatestSensorData(credentials: AIOCredentials) {
   };
 }
 
-/** Turn the pump ON or OFF via Adafruit IO */
-export async function controlPump(action: "1" | "0", credentials: AIOCredentials) {
-  return sendData(FEED_KEYS.pump(), action, credentials);
-}
-
-/** Get pump status (last value) */
-export async function getPumpStatus(credentials: AIOCredentials) {
-  const data = await getLastData(FEED_KEYS.pump(), credentials);
-  return {
-    status: data.value as "1" | "0",
-    updatedAt: data.created_at,
-  };
+/** Turn the pump ON or OFF via Adafruit IO.
+ * feedKey must be provided from the relay device's database record. */
+export async function controlPump(action: "1" | "0", credentials: AIOCredentials, feedKey: string) {
+  return sendData(feedKey, action, credentials);
 }

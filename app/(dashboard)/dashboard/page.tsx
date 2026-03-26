@@ -28,6 +28,15 @@ type SensorReading = {
   zoneId: string | null;
 };
 
+type SensorSnapshot = { temperature: number | null; humidity: number | null; soilMoisture: number | null; zoneId: string };
+
+type Device = {
+  id: string;
+  deviceType: string | null;
+  zoneId: string | null;
+  status: string;
+};
+
 // Get color classes based on soil moisture value and profile thresholds
 function soilColorClasses(val: number | null | undefined, minMoisture: number = 40, maxMoisture: number = 60) {
   if (val == null) return { text: "text-gray-400", bar: "bg-gray-300" };
@@ -42,8 +51,15 @@ export default function DashboardPage() {
   const [profiles, setProfiles] = useState<IrrigationProfile[]>([]);
   const [currentZoneId, setCurrentZoneId] = useState<string | null>(null);
   const [pumpState, setPumpState] = useState<boolean>(false);
-  const [liveData, setLiveData] = useState<{ temperature: number | null; humidity: number | null; soilMoisture: number | null } | null>(null);
+  const [relayDeviceId, setRelayDeviceId] = useState<string | null>(null);
+  const [initialData, setInitialData] = useState<SensorSnapshot | null>(null);
+  const [liveData, setLiveData] = useState<SensorSnapshot | null>(null);
   const [historyReadings, setHistoryReadings] = useState<SensorReading[]>([]);
+
+  // Displayed snapshot: prefer MQTT live data for current zone, fall back to last DB reading
+  const displayData =
+    (liveData?.zoneId === currentZoneId ? liveData : null) ??
+    (initialData?.zoneId === currentZoneId ? initialData : null);
 
   const currentZone = useMemo(() => zones.find(z => z.id === currentZoneId) ?? null, [zones, currentZoneId]);
 
@@ -71,6 +87,32 @@ export default function DashboardPage() {
       .catch(() => {});
   }, []);
 
+  // When zone changes: load last DB reading + relay device
+  useEffect(() => {
+    if (!currentZoneId) return;
+
+    // 1. Last sensor reading from DB for this zone
+    apiCall<SensorReading[]>(
+      `/api/sensor-readings?zoneId=${encodeURIComponent(currentZoneId)}&take=1`
+    ).then((readings) => {
+      if (readings.length > 0) {
+        const r = readings[0];
+        setInitialData({ temperature: r.temperature, humidity: r.humidity, soilMoisture: r.soilMoisture, zoneId: currentZoneId });
+      }
+    }).catch(() => {});
+
+    // 2. Relay device for this zone
+    apiCall<Device[]>(`/api/devices?zoneId=${encodeURIComponent(currentZoneId)}&deviceType=RELAY_MODULE`)
+      .then((devices) => {
+        if (devices.length > 0) {
+          const relay = devices[0];
+          setRelayDeviceId(relay.id);
+          setPumpState(relay.status === "ACTIVE");
+        }
+      })
+      .catch(() => {});
+  }, [currentZoneId]);
+
   // Fetch historical readings when zone or time-filter changes
   useEffect(() => {
     if (!currentZoneId) return;
@@ -84,9 +126,10 @@ export default function DashboardPage() {
       .catch(() => setHistoryReadings([]));
   }, [currentZoneId, timeFilter]);
 
-  // Subscribe to live MQTT sensor stream via SSE
+  // Subscribe to live MQTT sensor stream via SSE (reconnect when zone changes)
   useEffect(() => {
-    const source = new EventSource("/api/sensor-readings/stream");
+    if (!currentZoneId) return;
+    const source = new EventSource(`/api/sensor-readings/stream?zoneId=${encodeURIComponent(currentZoneId)}`);
     source.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data as string);
@@ -94,22 +137,24 @@ export default function DashboardPage() {
           temperature: data.temperature ?? null,
           humidity: data.humidity ?? null,
           soilMoisture: data.soilMoisture ?? null,
+          zoneId: currentZoneId,
         });
       } catch {
         // ignore malformed frames
       }
     };
     return () => source.close();
-  }, []);
+  }, [currentZoneId]);
 
   // Pump handlers
   const togglePump = async () => {
+    if (!relayDeviceId) return;
     const newState = !pumpState;
     setPumpState(newState);
     try {
-      await apiCall("/api/pump", {
-        method: "POST",
-        body: JSON.stringify({ action: newState ? "start" : "stop" }),
+      await apiCall(`/api/devices/${encodeURIComponent(relayDeviceId)}`, {
+        method: "PUT",
+        body: JSON.stringify({ status: newState ? "ACTIVE" : "OFFLINE" }),
       });
     } catch {
       // revert on failure
@@ -205,37 +250,39 @@ export default function DashboardPage() {
         </div>
 
         {/* Zone Operational Status */}
-        <div className="flex-4 bg-white rounded-sm shadow-sm border border-[#e0e0e0]">
+        <div className="flex-4 bg-white rounded-sm shadow-sm border border-[#e0e0e0] min-w-0">
           <div className="border-b border-[#eee] py-2 px-4 text-sm font-medium text-[#333]">Zone Soil Moisture Status</div>
           {zones.length === 0 ? (
             <div className="p-4 text-sm text-gray-400">No zones available.</div>
           ) : (
-            <div className="grid divide-x divide-gray-100" style={{ gridTemplateColumns: `repeat(${Math.min(zones.length, 4)}, minmax(0, 1fr))` }}>
-              {zones.slice(0, 4).map(zone => {
-                const isActive = zone.id === currentZoneId;
-                const soil = isActive ? (liveData?.soilMoisture ?? null) : null;
-                const profile = findProfile(zone.profileId);
-                const minMoisture = profile?.minMoisture ?? 40;
-                const maxMoisture = profile?.maxMoisture ?? 60;
-                const { text, bar } = soilColorClasses(soil, minMoisture, maxMoisture);
-                return (
-                  <div
-                    key={zone.id}
-                    onClick={() => setCurrentZoneId(zone.id)}
-                    className={`p-3 cursor-pointer transition-colors border-l-4 ${isActive ? "bg-[#f5f5f5] border-l-[#00695c]" : "border-l-transparent hover:bg-gray-50"}`}
-                  >
-                    <div className="flex justify-between items-end mb-2">
-                      <span className="text-sm font-bold text-slate-700 truncate mr-1">{zone.name}</span>
-                      <span className={`text-xs font-bold shrink-0 ${text}`}>
-                        {soil != null ? `${soil.toFixed(0)}%` : "--"}
-                      </span>
+            <div className="overflow-x-auto">
+              <div className="flex divide-x divide-gray-100">
+                {zones.map(zone => {
+                  const isActive = zone.id === currentZoneId;
+                  const soil = isActive ? (displayData?.soilMoisture ?? null) : null;
+                  const profile = findProfile(zone.profileId);
+                  const minMoisture = profile?.minMoisture ?? 40;
+                  const maxMoisture = profile?.maxMoisture ?? 60;
+                  const { text, bar } = soilColorClasses(soil, minMoisture, maxMoisture);
+                  return (
+                    <div
+                      key={zone.id}
+                      onClick={() => setCurrentZoneId(zone.id)}
+                      className={`w-40 shrink-0 p-3 cursor-pointer transition-colors border-l-4 ${isActive ? "bg-[#f5f5f5] border-l-[#00695c]" : "border-l-transparent hover:bg-gray-50"}`}
+                    >
+                      <div className="flex justify-between items-end mb-2">
+                        <span className="text-sm font-bold text-slate-700 truncate mr-1">{zone.name}</span>
+                        <span className={`text-xs font-bold shrink-0 ${text}`}>
+                          {soil != null ? `${soil.toFixed(0)}%` : "--"}
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-100 h-1 rounded-sm overflow-hidden">
+                        <div className={`${bar} h-full`} style={{ width: soil != null ? `${Math.min(100, soil)}%` : "0%" }}></div>
+                      </div>
                     </div>
-                    <div className="w-full bg-gray-100 h-1 rounded-sm overflow-hidden">
-                      <div className={`${bar} h-full`} style={{ width: soil != null ? `${Math.min(100, soil)}%` : "0%" }}></div>
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
@@ -253,7 +300,7 @@ export default function DashboardPage() {
               <span className="text-sm color-[#666] font-medium uppercase">Temperature <span className="text-xs block normal-case font-normal text-gray-400">Last update just now</span></span>
             </div>
             <div className="text-[32px] font-normal text-orange-600">
-              {liveData?.temperature != null ? liveData.temperature.toFixed(1) : "--"} <span className="text-lg">°C</span>
+              {displayData?.temperature != null ? displayData.temperature.toFixed(1) : "--"} <span className="text-lg">°C</span>
             </div>
           </div>
           
@@ -263,7 +310,7 @@ export default function DashboardPage() {
               <span className="text-sm color-[#666] font-medium uppercase">Humidity <span className="text-xs block normal-case font-normal text-gray-400">Last update just now</span></span>
             </div>
             <div className="text-[32px] font-normal text-blue-600">
-              {liveData?.humidity != null ? liveData.humidity.toFixed(0) : "--"} <span className="text-lg">%</span>
+              {displayData?.humidity != null ? displayData.humidity.toFixed(0) : "--"} <span className="text-lg">%</span>
             </div>
           </div>
           
@@ -273,7 +320,7 @@ export default function DashboardPage() {
               <span className="text-sm color-[#666] font-medium uppercase">Soil Moisture <span className="text-xs block normal-case font-normal text-gray-400">Last update just now</span></span>
             </div>
             <div className="text-[32px] font-normal text-emerald-600">
-              {liveData?.soilMoisture != null ? liveData.soilMoisture.toFixed(0) : "--"} <span className="text-lg">%</span>
+              {displayData?.soilMoisture != null ? displayData.soilMoisture.toFixed(0) : "--"} <span className="text-lg">%</span>
             </div>
           </div>
         </div>
