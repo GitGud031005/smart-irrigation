@@ -7,6 +7,8 @@ import { NextRequest } from "next/server";
 import { subscribeToFeed, unsubscribeFromFeed } from "@/lib/mqtt";
 import { getDeviceInZone } from "@/services/device-service";
 import { getZone } from "@/services/zone-service";
+import { verifyToken, COOKIE_NAME } from "@/lib/auth";
+import { getUserById } from "@/services/auth-service";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +20,21 @@ export async function GET(request: NextRequest) {
       headers: { "Content-Type": "application/json" },
     });
   }
+
+  // Auth — get user's Adafruit credentials
+  const token = request.cookies.get(COOKIE_NAME)?.value;
+  if (!token) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { "Content-Type": "application/json" } });
+  }
+  const payload = await verifyToken(token);
+  if (!payload) {
+    return new Response(JSON.stringify({ error: "Invalid token" }), { status: 401, headers: { "Content-Type": "application/json" } });
+  }
+  const dbUser = await getUserById(payload.userId);
+  if (!dbUser || !dbUser.adafruitUsername || !dbUser.adafruitKey) {
+    return new Response(JSON.stringify({ error: "Adafruit IO credentials not configured" }), { status: 422, headers: { "Content-Type": "application/json" } });
+  }
+  const credentials = { username: dbUser.adafruitUsername, key: dbUser.adafruitKey };
 
   const zone = await getZone(zoneId);
   if (!zone) {
@@ -92,14 +109,14 @@ export async function GET(request: NextRequest) {
       const tempHandler = makeHandler("temperature");
       const humHandler = makeHandler("humidity");
 
-      subscribeToFeed(feedKeys.soilMoisture, soilHandler);
-      subscribeToFeed(feedKeys.temperature, tempHandler);
-      subscribeToFeed(feedKeys.humidity, humHandler);
+      subscribeToFeed(credentials, feedKeys.soilMoisture, soilHandler);
+      subscribeToFeed(credentials, feedKeys.temperature, tempHandler);
+      subscribeToFeed(credentials, feedKeys.humidity, humHandler);
 
       cleanup = () => {
-        unsubscribeFromFeed(feedKeys.soilMoisture, soilHandler);
-        unsubscribeFromFeed(feedKeys.temperature, tempHandler);
-        unsubscribeFromFeed(feedKeys.humidity, humHandler);
+        unsubscribeFromFeed(credentials, feedKeys.soilMoisture, soilHandler);
+        unsubscribeFromFeed(credentials, feedKeys.temperature, tempHandler);
+        unsubscribeFromFeed(credentials, feedKeys.humidity, humHandler);
       };
     },
     cancel() {
