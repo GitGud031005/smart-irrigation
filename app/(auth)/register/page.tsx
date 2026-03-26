@@ -38,12 +38,12 @@ export default function RegisterPage() {
 
     setLoading(true);
     try {
-      const response = await apiCall<{ userId: string; email: string }>("/api/auth/register", {
+      const response = await apiCall<{ userId: string; email: string; adafruitUsername: string | null; adafruitKey: string | null }>("/api/auth/register", {
         method: "POST",
         body: JSON.stringify({ email, password }),
       });
       // Update auth context with registered user
-      login(response);
+      login({ userId: response.userId, email: response.email, adafruitUsername: response.adafruitUsername ?? "", adafruitKey: response.adafruitKey ?? "" });
       // Auto-logged in after registration → redirect to dashboard
       router.push("/dashboard");
     } catch (err) {
