@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Thermometer, Droplets, Sprout, Power } from "lucide-react";
 import { apiCall } from "@/lib/api";
-import type { Zone } from "@/models/zone";
+import { useZones } from "@/hooks/use-zones";
 import type { IrrigationProfile } from "@/models/irrigation-profile";
 import {
   Chart as ChartJS,
@@ -46,8 +46,8 @@ function soilColorClasses(val: number | null | undefined, minMoisture: number = 
 }
 
 export default function DashboardPage() {
+  const { zones } = useZones();
   const [timeFilter, setTimeFilter] = useState<"daily" | "weekly">("daily");
-  const [zones, setZones] = useState<Zone[]>([]);
   const [profiles, setProfiles] = useState<IrrigationProfile[]>([]);
   const [currentZoneId, setCurrentZoneId] = useState<string | null>(null);
   const [pumpState, setPumpState] = useState<boolean>(false);
@@ -73,17 +73,18 @@ export default function DashboardPage() {
     document.title = `BK-IRRIGATION | Dashboard${currentZone ? ` - ${currentZone.name}` : ""}`;
   }, [currentZone]);
 
-  // Fetch zones and profiles on mount
+  // Initialize currentZoneId from context zones (once available)
   useEffect(() => {
-    Promise.all([
-      apiCall<Zone[]>("/api/zones"),
-      apiCall<IrrigationProfile[]>("/api/profiles"),
-    ])
-      .then(([zonData, profData]) => {
-        setZones(zonData);
-        setProfiles(profData);
-        if (zonData.length > 0) setCurrentZoneId(zonData[0].id);
-      })
+    if (zones.length > 0 && currentZoneId === null) {
+      setCurrentZoneId(zones[0].id);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zones]);
+
+  // Fetch profiles on mount
+  useEffect(() => {
+    apiCall<IrrigationProfile[]>("/api/profiles")
+      .then(setProfiles)
       .catch(() => {});
   }, []);
 

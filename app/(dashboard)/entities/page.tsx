@@ -3,6 +3,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { Plus, Settings, Trash2, X, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
 import { apiCall } from "@/lib/api";
+import { useZones } from "@/hooks/use-zones";
+import type { Zone } from "@/models/zone";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -23,11 +25,6 @@ type Device = {
   zoneId: string | null;
   status: DeviceStatus;
   lastActiveAt: string | null;
-};
-
-type Zone = {
-  id: string;
-  name: string;
 };
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -346,9 +343,9 @@ function AddDeviceModal({ zones, onClose, onAdd }: AddDeviceModalProps) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function EntitiesPage() {
+  const { zones } = useZones();
   const [activeZoneIdx,  setActiveZoneIdx]  = useState(0);
   const [devices,        setDevices]        = useState<Device[]>([]);
-  const [zones,          setZones]          = useState<Zone[]>([]);
   const [loading,        setLoading]        = useState(true);
   const [error,          setError]          = useState<string | null>(null);
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
@@ -372,19 +369,8 @@ export default function EntitiesPage() {
     }
   };
 
-  const loadZones = async () => {
-    try {
-      const data = await apiCall<Zone[]>("/api/zones");
-      setZones(data);
-    } catch (err) {
-      // Zones loading failure should not block devices display
-      console.error("Failed to load zones:", err);
-    }
-  };
-
   useEffect(() => {
     loadDevices();
-    loadZones();
   }, []);
 
   // Filter devices by selected zone tab

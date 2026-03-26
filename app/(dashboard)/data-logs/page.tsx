@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { ChevronLeft, ChevronRight, Thermometer, Droplets, Sprout, RefreshCw, Wifi } from "lucide-react";
 import { apiCall } from "@/lib/api";
-import type { Zone } from "@/models/zone";
+import { useZones } from "@/hooks/use-zones";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -56,7 +56,7 @@ function getVisiblePages(current: number, total: number): (number | string)[] {
 // ─── Page component ──────────────────────────────────────────────────────────
 
 export default function DataLogsPage() {
-    const [zones, setZones] = useState<Zone[]>([]);
+    const { zones } = useZones();
     const [activeZoneId, setActiveZoneId] = useState<string | null>(null);
     const [page, setPage] = useState<number>(1);
     const [logs, setLogs] = useState<SensorLog[]>([]);
@@ -68,15 +68,13 @@ export default function DataLogsPage() {
         document.title = "BK-IRRIGATION | Data Logs";
     }, []);
 
-    // Fetch zones on mount
+    // Initialize activeZoneId once zones are available from context
     useEffect(() => {
-        apiCall<Zone[]>("/api/zones")
-            .then((data) => {
-                setZones(data);
-                if (data.length > 0) setActiveZoneId(data[0].id);
-            })
-            .catch(() => {});
-    }, []);
+        if (zones.length > 0 && activeZoneId === null) {
+            setActiveZoneId(zones[0].id);
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [zones]);
 
     // When active zone changes: sync from Adafruit then load history
     useEffect(() => {

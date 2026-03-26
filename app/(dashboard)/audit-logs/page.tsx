@@ -2,10 +2,11 @@
 // Audit Logs — displays real alerts from /api/alerts
 // Filter bar: type, severity, actor, keyword search
 // Log table: timestamp, severity badge, type, zone name, message, actor
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { Search } from "lucide-react";
 import type { AlertSeverity, AlertType, AlertActor } from "@/models/alert";
 import { apiCall } from "@/lib/api";
+import { useZones } from "@/hooks/use-zones";
 
 interface AlertRow {
   id: string;
@@ -15,11 +16,6 @@ interface AlertRow {
   type: AlertType;
   actor: AlertActor;
   createdAt: string;
-}
-
-interface Zone {
-  id: string;
-  name: string;
 }
 
 const SEVERITY_STYLES: Record<AlertSeverity, string> = {
@@ -59,9 +55,15 @@ const getVisiblePages = (current: number, total: number): (number | string)[] =>
 const PAGE_SIZE = 15;
 
 export default function AuditLogsPage() {
+  const { zones: zonesList } = useZones();
+  const zones = useMemo(() => {
+    const m = new Map<string, string>();
+    zonesList.forEach(z => m.set(z.id, z.name));
+    return m;
+  }, [zonesList]);
+
   const [alerts, setAlerts]     = useState<AlertRow[]>([]);
   const [filtered, setFiltered] = useState<AlertRow[]>([]);
-  const [zones, setZones]       = useState<Map<string, string>>(new Map());
   const [loading, setLoading]   = useState(true);
   const [page, setPage]         = useState(1);
 
@@ -76,20 +78,15 @@ export default function AuditLogsPage() {
   }, []);
 
   useEffect(() => {
-    // Fetch zones and alerts in parallel
-    Promise.all([
-      apiCall<Zone[]>("/api/zones").catch(() => [] as Zone[]),
-      apiCall<AlertRow[]>("/api/alerts?take=200").catch(() => [] as AlertRow[]),
-    ]).then(([zonesData, alertsData]) => {
-      const zoneMap = new Map<string, string>();
-      if (Array.isArray(zonesData)) {
-        zonesData.forEach((z: Zone) => zoneMap.set(z.id, z.name));
-      }
-      setZones(zoneMap);
-      const rows = Array.isArray(alertsData) ? alertsData : [];
-      setAlerts(rows);
-      setFiltered(rows);
-    }).finally(() => setLoading(false));
+    // Fetch alerts on mount
+    apiCall<AlertRow[]>("/api/alerts?take=200")
+      .catch(() => [] as AlertRow[])
+      .then((alertsData) => {
+        const rows = Array.isArray(alertsData) ? alertsData : [];
+        setAlerts(rows);
+        setFiltered(rows);
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   const applyFilters = useCallback(() => {

@@ -7,6 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiCall } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
+import { ZoneProvider } from "@/context/zone-context";
 import {
   LayoutGrid,
   LayoutDashboard,
@@ -312,7 +313,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* PAGE RENDER AREA */}
         <main className="flex-1 overflow-y-auto p-6">
-          {children}
+          <ZoneProvider>{children}</ZoneProvider>
         </main>
 
       </div>
