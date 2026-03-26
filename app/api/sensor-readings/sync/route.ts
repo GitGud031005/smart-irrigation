@@ -4,9 +4,13 @@
 // - Whenever any metric updates, a new reading is emitted using the current buffer values.
 // - recordedAt is always the timestamp of the most recent event that triggered the emission.
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getFeedData } from "@/lib/adafruit-io";
-import { createSensorReading, getLatestSensorReading,  } from "@/services/sensor-service";
+import { createSensorReading, getLatestSensorReading } from "@/services/sensor-service";
+import { getDeviceInZone } from "@/services/device-service";
+import { getZone } from "@/services/zone-service";
+import { verifyToken, COOKIE_NAME } from "@/lib/auth";
+import { getUserById } from "@/services/auth-service";
 
 interface AdafruitDatum {
   value: string;
@@ -21,17 +25,55 @@ interface BufferState {
   humidity: number | null;
 }
 
-export async function POST() {
+export async function POST(request: NextRequest) {
+  const token = request.cookies.get(COOKIE_NAME)?.value
+  if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const payload = await verifyToken(token)
+  if (!payload) return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
+
+  const dbUser = await getUserById(payload.userId)
+  if (!dbUser || !dbUser.adafruitUsername || !dbUser.adafruitKey) {
+    return NextResponse.json({ error: 'Adafruit IO credentials not configured. Please set them in the header settings.' }, { status: 422 })
+  }
+  const credentials = { username: dbUser.adafruitUsername, key: dbUser.adafruitKey }
+
+  let body: { zoneId?: string } = {}
+  try { body = await request.json() } catch { /* body is optional */ }
+
+  const zoneId = body.zoneId
+  if (!zoneId) return NextResponse.json({ error: 'zoneId is required in the request body' }, { status: 400 })
+
+  const zone = await getZone(zoneId)
+  if (!zone) return NextResponse.json({ error: 'Zone not found' }, { status: 404 })
+
   try {
+    // Zone → devices in zone by type → feedKey (required)
+    const [soilDevice, tempDevice, humDevice] = await Promise.all([
+      getDeviceInZone(zoneId, "SOIL_MOISTURE_SENSOR"),
+      getDeviceInZone(zoneId, "DHT20_TEMPERATURE_SENSOR"),
+      getDeviceInZone(zoneId, "DHT20_HUMIDITY_SENSOR"),
+    ]);
+
+    if (!soilDevice?.feedKey || !tempDevice?.feedKey || !humDevice?.feedKey) {
+      return NextResponse.json(
+        { error: "Sensor devices in this zone are missing feed key configuration" },
+        { status: 422 }
+      );
+    }
+
+    const soilFeedKey = soilDevice.feedKey;
+    const tempFeedKey = tempDevice.feedKey;
+    const humFeedKey = humDevice.feedKey;
+
     // Use the last stored reading as the lower bound for dedup
-    const lastStored = await getLatestSensorReading().then(r => r?.recordedAt ? new Date(r.recordedAt) : null);
+    const lastStored = await getLatestSensorReading(zoneId).then(r => r?.recordedAt ? new Date(r.recordedAt) : null);
 
     // Fetch new data from all 3 feeds since the last stored reading
     const startTime = lastStored?.toISOString();
     const [soilData, tempData, humData] = await Promise.all([
-      getFeedData(process.env.ADAFRUIT_IO_FEED_SOIL_MOISTURE || "soil-moisture", startTime ? { start_time: startTime } : undefined),
-      getFeedData(process.env.ADAFRUIT_IO_FEED_TEMPERATURE || "temperature", startTime ? { start_time: startTime } : undefined),
-      getFeedData(process.env.ADAFRUIT_IO_FEED_HUMIDITY || "humidity", startTime ? { start_time: startTime } : undefined),
+      getFeedData(soilFeedKey, credentials, startTime ? { start_time: startTime } : undefined),
+      getFeedData(tempFeedKey, credentials, startTime ? { start_time: startTime } : undefined),
+      getFeedData(humFeedKey, credentials, startTime ? { start_time: startTime } : undefined),
     ]);
 
     // Tag each datum with its metric, parse value, and filter out already-stored or invalid entries
@@ -73,7 +115,7 @@ export async function POST() {
       });
     }
 
-    const inserts = await Promise.all(toInsert.map(r => createSensorReading(r)));
+    const inserts = await Promise.all(toInsert.map(r => createSensorReading({ ...r, zoneId })));
     return NextResponse.json({ inserted: inserts.length });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";

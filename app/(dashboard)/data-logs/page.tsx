@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { ChevronLeft, ChevronRight, Thermometer, Droplets, Sprout, RefreshCw, Wifi } from "lucide-react";
 import { apiCall } from "@/lib/api";
+import type { Zone } from "@/models/zone";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -16,13 +17,6 @@ type SensorLog = {
 };
 
 // ─── Constants ───────────────────────────────────────────────────────────────
-
-const ZONES = [
-    { id: 1, name: "Z1: Ornamental" },
-    { id: 2, name: "Z2: Lettuce" },
-    { id: 3, name: "Z3: Rose Nursery" },
-    { id: 4, name: "Z4: Orchids" },
-];
 
 const PAGE_SIZE = 15;
 
@@ -62,10 +56,11 @@ function getVisiblePages(current: number, total: number): (number | string)[] {
 // ─── Page component ──────────────────────────────────────────────────────────
 
 export default function DataLogsPage() {
-    const [activeZone, setActiveZone] = useState<number>(1);
+    const [zones, setZones] = useState<Zone[]>([]);
+    const [activeZoneId, setActiveZoneId] = useState<string | null>(null);
     const [page, setPage] = useState<number>(1);
     const [logs, setLogs] = useState<SensorLog[]>([]);
-    const [loading, setLoading] = useState<boolean>(true);
+    const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
     const [liveConnected, setLiveConnected] = useState<boolean>(false);
 
@@ -73,8 +68,19 @@ export default function DataLogsPage() {
         document.title = "BK-IRRIGATION | Data Logs";
     }, []);
 
-    // On mount: POST sync (pull new data from Adafruit → DB), then GET history from DB
+    // Fetch zones on mount
     useEffect(() => {
+        apiCall<Zone[]>("/api/zones")
+            .then((data) => {
+                setZones(data);
+                if (data.length > 0) setActiveZoneId(data[0].id);
+            })
+            .catch(() => {});
+    }, []);
+
+    // When active zone changes: sync from Adafruit then load history
+    useEffect(() => {
+        if (!activeZoneId) return;
         let cancelled = false;
 
         async function loadData() {
@@ -82,10 +88,13 @@ export default function DataLogsPage() {
             setError(null);
             try {
                 // Sync new Adafruit readings into the DB first
-                await apiCall("/api/sensor-readings/sync", { method: "POST" });
+                await apiCall("/api/sensor-readings/sync", {
+                    method: "POST",
+                    body: JSON.stringify({ zoneId: activeZoneId }),
+                });
 
-                // Fetch full history
-                const data = await apiCall<SensorLog[]>("/api/sensor-readings");
+                // Fetch history for this zone
+                const data = await apiCall<SensorLog[]>(`/api/sensor-readings?zoneId=${encodeURIComponent(activeZoneId!)}`);
                 if (!cancelled) setLogs(data);
             } catch (err) {
                 if (!cancelled) setError(err instanceof Error ? err.message : "Unknown error");
@@ -96,11 +105,12 @@ export default function DataLogsPage() {
 
         loadData();
         return () => { cancelled = true; };
-    }, []);
+    }, [activeZoneId]);
 
-    // Subscribe to live readings via SSE → MQTT (server streams new readings as they arrive)
+    // Subscribe to live readings via SSE → MQTT (reconnect when zone changes)
     useEffect(() => {
-        const source = new EventSource("/api/sensor-readings/stream");
+        if (!activeZoneId) return;
+        const source = new EventSource(`/api/sensor-readings/stream?zoneId=${encodeURIComponent(activeZoneId)}`);
 
         source.onopen = () => setLiveConnected(true);
 
@@ -129,7 +139,7 @@ export default function DataLogsPage() {
             source.close();
             setLiveConnected(false);
         };
-    }, []);
+    }, [activeZoneId]);
 
     const totalPages = Math.max(1, Math.ceil(logs.length / PAGE_SIZE));
     const pageData = useMemo(
@@ -137,8 +147,8 @@ export default function DataLogsPage() {
         [logs, page]
     );
 
-    const handleZoneChange = (zoneId: number) => {
-        setActiveZone(zoneId);
+    const handleZoneChange = (zoneId: string) => {
+        setActiveZoneId(zoneId);
         setPage(1);
     };
 
@@ -165,11 +175,11 @@ export default function DataLogsPage() {
 
             {/* Zone Tabs */}
             <div className="mb-0 shrink-0 flex border-b border-[#e0e0e0]">
-                {ZONES.map((zone) => (
+                {zones.map((zone) => (
                     <button
                         key={zone.id}
                         onClick={() => handleZoneChange(zone.id)}
-                        className={`flex-1 py-2.5 text-[12px] font-bold uppercase tracking-wide transition-colors border-b-2 ${activeZone === zone.id
+                        className={`flex-1 py-2.5 text-[12px] font-bold uppercase tracking-wide transition-colors border-b-2 ${activeZoneId === zone.id
                                 ? "border-[#00695c] text-[#00695c] bg-white"
                                 : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50"
                             }`}

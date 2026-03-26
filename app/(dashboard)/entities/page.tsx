@@ -8,9 +8,18 @@ import { apiCall } from "@/lib/api";
 
 type DeviceStatus = "ACTIVE" | "OFFLINE" | "ERROR";
 
+type DeviceType =
+  | "SOIL_MOISTURE_SENSOR"
+  | "DHT20_TEMPERATURE_SENSOR"
+  | "DHT20_HUMIDITY_SENSOR"
+  | "RELAY_MODULE"
+  | "LCD_16X2_DISPLAY"
+  | "ESP32";
+
 type Device = {
   id: string;
-  deviceType: string | null;
+  deviceType: DeviceType | null;
+  feedKey: string | null;
   zoneId: string | null;
   status: DeviceStatus;
   lastActiveAt: string | null;
@@ -29,6 +38,24 @@ const STATUS_BADGE: Record<DeviceStatus, string> = {
   ACTIVE:  "bg-emerald-100 text-emerald-700",
   OFFLINE: "bg-gray-100 text-gray-500",
   ERROR:   "bg-red-100 text-red-700",
+};
+
+const DEVICE_TYPE_OPTIONS: { value: DeviceType; label: string }[] = [
+  { value: "SOIL_MOISTURE_SENSOR",    label: "Soil Moisture Sensor" },
+  { value: "DHT20_TEMPERATURE_SENSOR", label: "DHT20 Temperature Sensor" },
+  { value: "DHT20_HUMIDITY_SENSOR",   label: "DHT20 Humidity Sensor" },
+  { value: "RELAY_MODULE",            label: "Relay Module" },
+  { value: "LCD_16X2_DISPLAY",        label: "LCD 16x2 Display" },
+  { value: "ESP32",                   label: "ESP32" },
+];
+
+const DEVICE_TYPE_LABEL: Record<DeviceType, string> = {
+  SOIL_MOISTURE_SENSOR:    "Soil Moisture Sensor",
+  DHT20_TEMPERATURE_SENSOR: "DHT20 Temperature Sensor",
+  DHT20_HUMIDITY_SENSOR:   "DHT20 Humidity Sensor",
+  RELAY_MODULE:            "Relay Module",
+  LCD_16X2_DISPLAY:        "LCD 16x2 Display",
+  ESP32:                   "ESP32",
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -54,13 +81,14 @@ type SettingsModalProps = {
   device: Device;
   zones: Zone[];
   onClose: () => void;
-  onSave: (id: string, data: { deviceType: string | null; zoneId: string | null; status: DeviceStatus }) => Promise<void>;
+  onSave: (id: string, data: { deviceType: DeviceType | null; feedKey: string | null; zoneId: string | null; status: DeviceStatus }) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
 };
 
 function SettingsModal({ device, zones, onClose, onSave, onDelete }: SettingsModalProps) {
   const [form, setForm] = useState({
-    deviceType: device.deviceType ?? "",
+    deviceType: device.deviceType ?? "" as DeviceType | "",
+    feedKey:    device.feedKey ?? "",
     zoneId:     device.zoneId ?? "",
     status:     device.status,
   });
@@ -72,6 +100,7 @@ function SettingsModal({ device, zones, onClose, onSave, onDelete }: SettingsMod
     setSaving(true);
     await onSave(device.id, {
       deviceType: form.deviceType || null,
+      feedKey:    form.feedKey    || null,
       zoneId:     form.zoneId     || null,
       status:     form.status,
     });
@@ -114,11 +143,25 @@ function SettingsModal({ device, zones, onClose, onSave, onDelete }: SettingsMod
           {/* deviceType */}
           <div>
             <label className="block text-[11px] font-bold uppercase text-gray-400 mb-1">Device Type</label>
-            <input
+            <select
               className="w-full border border-[#ddd] rounded px-2 py-1.5 text-sm focus:outline-none focus:border-[#00695c]"
               value={form.deviceType}
-              onChange={(e) => setForm({ ...form, deviceType: e.target.value })}
-              placeholder="e.g. Sensor Node"
+              onChange={(e) => setForm({ ...form, deviceType: e.target.value as DeviceType | "" })}
+            >
+              <option value="">— Select type —</option>
+              {DEVICE_TYPE_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+          {/* feedKey */}
+          <div>
+            <label className="block text-[11px] font-bold uppercase text-gray-400 mb-1">Feed Key</label>
+            <input
+              className="w-full border border-[#ddd] rounded px-2 py-1.5 text-sm focus:outline-none focus:border-[#00695c] font-mono"
+              value={form.feedKey}
+              onChange={(e) => setForm({ ...form, feedKey: e.target.value })}
+              placeholder="e.g. username/feed-name"
             />
           </div>
           {/* zoneId */}
@@ -197,17 +240,18 @@ function SettingsModal({ device, zones, onClose, onSave, onDelete }: SettingsMod
 type AddDeviceModalProps = {
   zones: Zone[];
   onClose: () => void;
-  onAdd: (data: { deviceType: string | null; zoneId: string | null; status: DeviceStatus }) => Promise<void>;
+  onAdd: (data: { deviceType: DeviceType | null; feedKey: string | null; zoneId: string | null; status: DeviceStatus }) => Promise<void>;
 };
 
 function AddDeviceModal({ zones, onClose, onAdd }: AddDeviceModalProps) {
-  const [form, setForm] = useState({ deviceType: "", zoneId: "", status: "ACTIVE" as DeviceStatus });
+  const [form, setForm] = useState({ deviceType: "" as DeviceType | "", feedKey: "", zoneId: "", status: "ACTIVE" as DeviceStatus });
   const [saving, setSaving] = useState(false);
 
   const handleAdd = async () => {
     setSaving(true);
     await onAdd({
       deviceType: form.deviceType || null,
+      feedKey:    form.feedKey    || null,
       zoneId:     form.zoneId     || null,
       status:     form.status,
     });
@@ -233,11 +277,24 @@ function AddDeviceModal({ zones, onClose, onAdd }: AddDeviceModalProps) {
         <div className="p-4 space-y-3">
           <div>
             <label className="block text-[11px] font-bold uppercase text-gray-400 mb-1">Device Type</label>
-            <input
+            <select
               className="w-full border border-[#ddd] rounded px-2 py-1.5 text-sm focus:outline-none focus:border-[#00695c]"
               value={form.deviceType}
-              onChange={(e) => setForm({ ...form, deviceType: e.target.value })}
-              placeholder="e.g. Sensor Node"
+              onChange={(e) => setForm({ ...form, deviceType: e.target.value as DeviceType | "" })}
+            >
+              <option value="">— Select type —</option>
+              {DEVICE_TYPE_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-[11px] font-bold uppercase text-gray-400 mb-1">Feed Key</label>
+            <input
+              className="w-full border border-[#ddd] rounded px-2 py-1.5 text-sm focus:outline-none focus:border-[#00695c] font-mono"
+              value={form.feedKey}
+              onChange={(e) => setForm({ ...form, feedKey: e.target.value })}
+              placeholder="e.g. username/feed-name"
             />
           </div>
           <div>
@@ -346,7 +403,7 @@ export default function EntitiesPage() {
 
   const handleSave = async (
     id: string,
-    data: { deviceType: string | null; zoneId: string | null; status: DeviceStatus }
+    data: { deviceType: DeviceType | null; feedKey: string | null; zoneId: string | null; status: DeviceStatus }
   ) => {
     await apiCall(`/api/devices/${id}`, { method: "PUT", body: JSON.stringify(data) });
     await loadDevices();
@@ -357,7 +414,7 @@ export default function EntitiesPage() {
     await loadDevices();
   };
 
-  const handleAdd = async (data: { deviceType: string | null; zoneId: string | null; status: DeviceStatus }) => {
+  const handleAdd = async (data: { deviceType: DeviceType | null; feedKey: string | null; zoneId: string | null; status: DeviceStatus }) => {
     await apiCall("/api/devices", { method: "POST", body: JSON.stringify(data) });
     await loadDevices();
   };
@@ -443,7 +500,7 @@ export default function EntitiesPage() {
                     <tr key={device.id} className="hover:bg-[#fafafa] transition-colors">
                       <td className="px-4 py-2.5 w-8 text-gray-400">{(page - 1) * PAGE_SIZE + idx + 1}</td>
                       <td className="px-4 py-2.5 w-56 font-mono text-gray-500 text-[11px]">{device.id}</td>
-                      <td className="px-4 py-2.5 w-32">{device.deviceType ?? <span className="text-gray-300">—</span>}</td>
+                      <td className="px-4 py-2.5 w-32">{device.deviceType ? DEVICE_TYPE_LABEL[device.deviceType] : <span className="text-gray-300">—</span>}</td>
                       <td className="px-4 py-2.5 w-20">
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${STATUS_BADGE[device.status]}`}>
                           {device.status}

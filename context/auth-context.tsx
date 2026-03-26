@@ -6,6 +6,8 @@ import { apiCall } from '@/lib/api';
 export type User = {
   userId: string;
   email: string;
+  adafruitUsername: string;
+  adafruitKey: string;
 };
 
 export type AuthContextType = {
@@ -26,7 +28,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const restore = async () => {
       try {
-        const data = await apiCall<User>('/api/auth/me');
+        const data = await apiCall<User>('/api/users/me');
         setUser(data);
       } catch {
         setUser(null);

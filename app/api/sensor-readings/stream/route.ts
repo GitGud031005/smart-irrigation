@@ -1,12 +1,69 @@
-// GET /api/sensor-readings/stream — SSE endpoint for live sensor readings
+// GET /api/sensor-readings/stream?zoneId=<id> — SSE endpoint for live sensor readings.
+// Flow: zone → devices in zone by type → feedKey → MQTT subscription
 // Subscribes to Adafruit IO MQTT feeds server-side and pushes new combined readings
 // to the browser via Server-Sent Events whenever all 3 metrics are buffered.
 
+import { NextRequest } from "next/server";
 import { subscribeToFeed, unsubscribeFromFeed } from "@/lib/mqtt";
+import { getDeviceInZone } from "@/services/device-service";
+import { getZone } from "@/services/zone-service";
+import { verifyToken, COOKIE_NAME } from "@/lib/auth";
+import { getUserById } from "@/services/auth-service";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const zoneId = request.nextUrl.searchParams.get("zoneId");
+  if (!zoneId) {
+    return new Response(JSON.stringify({ error: "zoneId query parameter is required" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  // Auth — get user's Adafruit credentials
+  const token = request.cookies.get(COOKIE_NAME)?.value;
+  if (!token) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { "Content-Type": "application/json" } });
+  }
+  const payload = await verifyToken(token);
+  if (!payload) {
+    return new Response(JSON.stringify({ error: "Invalid token" }), { status: 401, headers: { "Content-Type": "application/json" } });
+  }
+  const dbUser = await getUserById(payload.userId);
+  if (!dbUser || !dbUser.adafruitUsername || !dbUser.adafruitKey) {
+    return new Response(JSON.stringify({ error: "Adafruit IO credentials not configured" }), { status: 422, headers: { "Content-Type": "application/json" } });
+  }
+  const credentials = { username: dbUser.adafruitUsername, key: dbUser.adafruitKey };
+
+  const zone = await getZone(zoneId);
+  if (!zone) {
+    return new Response(JSON.stringify({ error: "Zone not found" }), {
+      status: 404,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  // Zone → devices in zone by type → feedKey (required)
+  const [soilDevice, tempDevice, humDevice] = await Promise.all([
+    getDeviceInZone(zoneId, "SOIL_MOISTURE_SENSOR"),
+    getDeviceInZone(zoneId, "DHT20_TEMPERATURE_SENSOR"),
+    getDeviceInZone(zoneId, "DHT20_HUMIDITY_SENSOR"),
+  ]);
+
+  if (!soilDevice?.feedKey || !tempDevice?.feedKey || !humDevice?.feedKey) {
+    return new Response(JSON.stringify({ error: "Sensor devices in this zone are missing feed key configuration" }), {
+      status: 422,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  const feedKeys = {
+    soilMoisture: soilDevice.feedKey,
+    temperature: tempDevice.feedKey,
+    humidity: humDevice.feedKey,
+  };
+
   const encoder = new TextEncoder();
 
   const buffer = {
@@ -19,12 +76,6 @@ export async function GET() {
 
   const stream = new ReadableStream({
     start(controller) {
-      const feedKeys = {
-        soilMoisture: process.env.ADAFRUIT_IO_FEED_SOIL_MOISTURE || "soil",
-        temperature: process.env.ADAFRUIT_IO_FEED_TEMPERATURE || "temperature",
-        humidity: process.env.ADAFRUIT_IO_FEED_HUMIDITY || "humidity",
-      };
-
       const emit = (payload: object) => {
         try {
           controller.enqueue(
@@ -58,14 +109,14 @@ export async function GET() {
       const tempHandler = makeHandler("temperature");
       const humHandler = makeHandler("humidity");
 
-      subscribeToFeed(feedKeys.soilMoisture, soilHandler);
-      subscribeToFeed(feedKeys.temperature, tempHandler);
-      subscribeToFeed(feedKeys.humidity, humHandler);
+      subscribeToFeed(credentials, feedKeys.soilMoisture, soilHandler);
+      subscribeToFeed(credentials, feedKeys.temperature, tempHandler);
+      subscribeToFeed(credentials, feedKeys.humidity, humHandler);
 
       cleanup = () => {
-        unsubscribeFromFeed(feedKeys.soilMoisture, soilHandler);
-        unsubscribeFromFeed(feedKeys.temperature, tempHandler);
-        unsubscribeFromFeed(feedKeys.humidity, humHandler);
+        unsubscribeFromFeed(credentials, feedKeys.soilMoisture, soilHandler);
+        unsubscribeFromFeed(credentials, feedKeys.temperature, tempHandler);
+        unsubscribeFromFeed(credentials, feedKeys.humidity, humHandler);
       };
     },
     cancel() {

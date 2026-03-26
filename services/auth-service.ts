@@ -19,3 +19,7 @@ export async function updateUserPassword(id: string, newPassword: string): Promi
 	const hash = await bcrypt.hash(newPassword, 10)
 	return prisma.user.update({ where: { id }, data: { passwordHash: hash } })
 }
+
+export async function updateAdafruitConfig(id: string, data: { adafruitUsername: string; adafruitKey: string }): Promise<User> {
+	return prisma.user.update({ where: { id }, data })
+}

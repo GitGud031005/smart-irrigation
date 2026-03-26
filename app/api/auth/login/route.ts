@@ -34,7 +34,10 @@ const handler = async (request: NextRequest) => {
     const token = await createToken({ userId: user.id, email: user.email });
     const res = NextResponse.json({
       success: true,
-      user: { id: user.id, email: user.email },
+      userId: user.id,
+      email: user.email,
+      adafruitUsername: (user as any).adafruitUsername ?? null,
+      adafruitKey: (user as any).adafruitKey ?? null,
     });
     res.cookies.set(COOKIE_NAME, token, {
       httpOnly: true,

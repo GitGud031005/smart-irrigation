@@ -24,10 +24,11 @@ import {
   X,
   LogOut,
   KeyRound,
+  Wifi,
 } from "lucide-react";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { user, logout } = useAuth();
+  const { user, logout, setUser } = useAuth();
   const router = useRouter();
   
   // handle live clock state
@@ -42,6 +43,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [pwLoading, setPwLoading] = useState(false);
   const [pwError, setPwError] = useState<string | null>(null);
   const [pwSuccess, setPwSuccess] = useState(false);
+
+  // Adafruit config modal state
+  const [showAdafruitModal, setShowAdafruitModal] = useState(false);
+  const [aioForm, setAioForm] = useState({ username: '', key: '' });
+  const [aioLoading, setAioLoading] = useState(false);
+  const [aioError, setAioError] = useState<string | null>(null);
+  const [aioSuccess, setAioSuccess] = useState(false);
+
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const currentPage = useMemo(() => {
@@ -86,6 +95,35 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const handleLogout = async () => {
     await logout();
     router.push('/login');
+  };
+
+  const handleOpenAdafruitModal = () => {
+    setAioForm({ username: user?.adafruitUsername || '', key: user?.adafruitKey || '' });
+    setAioError(null);
+    setAioSuccess(false);
+    setDropdownOpen(false);
+    setShowAdafruitModal(true);
+  };
+
+  const handleSaveAdafruitConfig = async () => {
+    setAioLoading(true);
+    setAioError(null);
+    try {
+      const updated = await apiCall<{ userId: string; email: string; adafruitUsername: string; adafruitKey: string }>('/api/users/me', {
+        method: 'PATCH',
+        body: JSON.stringify({ adafruitUsername: aioForm.username, adafruitKey: aioForm.key }),
+      });
+      setUser({ ...user!, adafruitUsername: updated.adafruitUsername, adafruitKey: updated.adafruitKey });
+      setAioSuccess(true);
+      setTimeout(() => {
+        setShowAdafruitModal(false);
+        setAioSuccess(false);
+      }, 1500);
+    } catch (err) {
+      setAioError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setAioLoading(false);
+    }
   };
 
   const handleChangePassword = async () => {
@@ -222,12 +260,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
 
             {/* notifications */}
-            <button className="relative opacity-80 hover:opacity-100 transition" title="Notifications">
+            {/* <button className="relative opacity-80 hover:opacity-100 transition" title="Notifications">
               <Bell className="w-4 h-4" />
               <span className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-red-500 rounded-full text-[8px] font-bold flex items-center justify-center">
                 3
               </span>
-            </button>
+            </button> */}
 
             {/* user profile */}
             <div ref={dropdownRef} className="relative flex items-center border-l border-white/20 pl-4">
@@ -251,6 +289,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     <KeyRound className="w-3.5 h-3.5 text-gray-400" />
                     Change Password
                   </button>
+                  <button
+                    onClick={handleOpenAdafruitModal}
+                    className="w-full px-4 py-2 text-left text-[12px] flex items-center gap-2 text-gray-600 hover:bg-gray-50 transition-colors"
+                  >
+                    <Wifi className="w-3.5 h-3.5 text-gray-400" />
+                    Adafruit Config
+                  </button>
                   <div className="border-t border-[#f0f0f0]" />
                   <button
                     onClick={handleLogout}
@@ -272,6 +317,81 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       </div>
     </div>
+
+    {/* Adafruit Config Modal */}
+    {showAdafruitModal && (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm"
+        onClick={() => { setShowAdafruitModal(false); setAioError(null); }}
+      >
+        <div
+          className="bg-white rounded shadow-lg w-96 border border-[#e0e0e0]"
+          onClick={e => e.stopPropagation()}
+        >
+          <div className="flex justify-between items-center border-b border-[#eee] py-3 px-4">
+            <span className="font-medium text-sm text-slate-800">Adafruit IO Config</span>
+            <button
+              onClick={() => { setShowAdafruitModal(false); setAioError(null); }}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="p-4 space-y-3">
+            {aioSuccess ? (
+              <p className="text-emerald-600 text-sm text-center py-4 font-medium">Adafruit credentials saved!</p>
+            ) : (
+              <>
+                {aioError && (
+                  <p className="text-red-500 text-xs bg-red-50 px-3 py-2 rounded border border-red-100">{aioError}</p>
+                )}
+                <div>
+                  <label className="block text-[11px] font-bold uppercase text-gray-400 mb-1">Adafruit IO Username</label>
+                  <input
+                    type="text"
+                    className="w-full border border-[#ddd] rounded px-2 py-1.5 text-black text-sm focus:outline-none focus:border-[#00695c]"
+                    value={aioForm.username}
+                    onChange={e => setAioForm(f => ({ ...f, username: e.target.value }))}
+                    autoComplete="off"
+                    placeholder="your-adafruit-username"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold uppercase text-gray-400 mb-1">Adafruit IO Key</label>
+                  <input
+                    type="password"
+                    className="w-full border border-[#ddd] rounded px-2 py-1.5 text-black text-sm focus:outline-none focus:border-[#00695c]"
+                    value={aioForm.key}
+                    onChange={e => setAioForm(f => ({ ...f, key: e.target.value }))}
+                    autoComplete="new-password"
+                    placeholder="aio_xxxxxxxxxxxxxxxxxxxxxxxx"
+                  />
+                </div>
+              </>
+            )}
+          </div>
+
+          {!aioSuccess && (
+            <div className="border-t border-[#eee] py-3 px-4 flex justify-end gap-2">
+              <button
+                onClick={() => { setShowAdafruitModal(false); setAioError(null); }}
+                className="text-xs px-3 py-1.5 rounded border border-[#ddd] text-gray-500 hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveAdafruitConfig}
+                disabled={aioLoading || !aioForm.username || !aioForm.key}
+                className="text-xs px-3 py-1.5 rounded bg-[#00695c] text-white font-bold uppercase hover:brightness-110 transition-all disabled:opacity-60"
+              >
+                {aioLoading ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    )}
 
     {/* Change Password Modal */}
     {showPasswordModal && (
@@ -305,7 +425,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <label className="block text-[11px] font-bold uppercase text-gray-400 mb-1">Current Password</label>
                   <input
                     type="password"
-                    className="w-full border border-[#ddd] rounded px-2 py-1.5 text-sm focus:outline-none focus:border-[#00695c]"
+                    className="w-full border border-[#ddd] rounded px-2 py-1.5 text-black text-sm focus:outline-none focus:border-[#00695c]"
                     value={pwForm.currentPassword}
                     onChange={e => setPwForm(f => ({ ...f, currentPassword: e.target.value }))}
                     autoComplete="current-password"
@@ -315,7 +435,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <label className="block text-[11px] font-bold uppercase text-gray-400 mb-1">New Password</label>
                   <input
                     type="password"
-                    className="w-full border border-[#ddd] rounded px-2 py-1.5 text-sm focus:outline-none focus:border-[#00695c]"
+                    className="w-full border border-[#ddd] rounded px-2 py-1.5 text-black text-sm focus:outline-none focus:border-[#00695c]"
                     value={pwForm.newPassword}
                     onChange={e => setPwForm(f => ({ ...f, newPassword: e.target.value }))}
                     autoComplete="new-password"

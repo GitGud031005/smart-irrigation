@@ -13,9 +13,11 @@ datasource db {
 }
 
 model User {
-  id           String  @id @default(uuid()) @map("user_id")
-  email        String  @unique
-  passwordHash String  @map("password_hash")
+  id               String  @id @default(uuid()) @map("user_id")
+  email            String  @unique
+  passwordHash     String  @map("password_hash")
+  adafruitUsername String  @default("") @map("adafruit_username")
+  adafruitKey      String  @default("") @map("adafruit_key")
 
   zones Zone[]
 
@@ -78,16 +80,26 @@ model Zone {
 }
 
 model Device {
-  id         String @id @default(uuid()) @map("device_id")
-  deviceType String? @map("device_type")
+  id         String      @id @default(uuid()) @map("device_id")
+  deviceType DeviceType? @map("device_type")
+  feedKey    String?     @map("feed_key")
 
   zone   Zone? @relation(fields: [zoneId], references: [id])
   zoneId String?
 
-  lastActiveAt DateTime? @map("last_active_at")
+  lastActiveAt DateTime?    @map("last_active_at")
   status       DeviceStatus @default(ACTIVE) @map("status")
 
   @@map("DEVICE")
+}
+
+enum DeviceType {
+  SOIL_MOISTURE_SENSOR
+  DHT20_TEMPERATURE_SENSOR
+  DHT20_HUMIDITY_SENSOR
+  RELAY_MODULE
+  LCD_16X2_DISPLAY
+  ESP32
 }
 
 enum IrrigationMode {

@@ -8,41 +8,35 @@ import mqtt, { MqttClient } from "mqtt";
 const AIO_MQTT_HOST = "mqtts://io.adafruit.com";
 const AIO_MQTT_PORT = 8883;
 
-function getConfig() {
-  const username = process.env.ADAFRUIT_IO_USERNAME;
-  const key = process.env.ADAFRUIT_IO_KEY;
-  if (!username || !key) {
-    throw new Error(
-      "Missing ADAFRUIT_IO_USERNAME or ADAFRUIT_IO_KEY in environment"
-    );
-  }
-  return { username, key };
+export interface AIOCredentials {
+  username: string;
+  key: string;
 }
 
 type MessageHandler = (feedKey: string, value: string) => void;
 
-let client: MqttClient | null = null;
-const listeners = new Map<string, Set<MessageHandler>>();
+const clients = new Map<string, MqttClient>();
+const listeners = new Map<string, Map<string, Set<MessageHandler>>>();
 
-/** Connect to Adafruit IO MQTT broker (singleton — safe to call multiple times) */
-export function connectMqtt(): MqttClient {
-  if (client) return client;
+/** Connect to Adafruit IO MQTT broker (per-user — credentials required) */
+export function connectMqtt(credentials: AIOCredentials): MqttClient {
+  const clientKey = credentials.username;
+  
+  if (clients.has(clientKey)) return clients.get(clientKey)!;
 
-  const { username, key } = getConfig();
-
-  client = mqtt.connect(AIO_MQTT_HOST, {
+  const client = mqtt.connect(AIO_MQTT_HOST, {
     port: AIO_MQTT_PORT,
-    username: username,
-    password: key,
+    username: credentials.username,
+    password: credentials.key,
     protocol: "mqtts",
   });
 
   client.on("connect", () => {
-    console.log("[MQTT] Connected to Adafruit IO");
+    console.log(`[MQTT] Connected to Adafruit IO as ${credentials.username}`);
   });
 
   client.on("error", (err: Error) => {
-    console.error("[MQTT] Connection error:", err.message);
+    console.error(`[MQTT] Connection error (${credentials.username}):`, err.message);
   });
 
   client.on("message", (topic: string, payload: Buffer) => {
@@ -51,26 +45,41 @@ export function connectMqtt(): MqttClient {
     if (!feedKey) return;
 
     const value = payload.toString();
-    const handlers = listeners.get(feedKey);
-    if (handlers) {
-      handlers.forEach((handler) => handler(feedKey, value));
+    const userListeners = listeners.get(clientKey);
+    if (userListeners) {
+      const handlers = userListeners.get(feedKey);
+      if (handlers) {
+        handlers.forEach((handler) => handler(feedKey, value));
+      }
     }
   });
 
+  clients.set(clientKey, client);
+  listeners.set(clientKey, new Map());
   return client;
 }
 
 /** Subscribe to a feed and register a callback for incoming messages */
-export function subscribeToFeed(feedKey: string, handler: MessageHandler) {
-  const mqttClient = connectMqtt();
-  const { username } = getConfig();
-  const topic = `${username}/feeds/${feedKey}`;
+export function subscribeToFeed(
+  credentials: AIOCredentials,
+  feedKey: string,
+  handler: MessageHandler
+) {
+  const clientKey = credentials.username;
+  const mqttClient = connectMqtt(credentials);
+  const topic = `${credentials.username}/feeds/${feedKey}`;
+
+  // Ensure listeners map exists for this user
+  if (!listeners.has(clientKey)) {
+    listeners.set(clientKey, new Map());
+  }
 
   // Register handler
-  if (!listeners.has(feedKey)) {
-    listeners.set(feedKey, new Set());
+  const userListeners = listeners.get(clientKey)!;
+  if (!userListeners.has(feedKey)) {
+    userListeners.set(feedKey, new Set());
   }
-  listeners.get(feedKey)!.add(handler);
+  userListeners.get(feedKey)!.add(handler);
 
   // Subscribe on MQTT broker
   mqttClient.subscribe(topic, (err: Error | null) => {
@@ -83,25 +92,40 @@ export function subscribeToFeed(feedKey: string, handler: MessageHandler) {
 }
 
 /** Unsubscribe a handler from a feed */
-export function unsubscribeFromFeed(feedKey: string, handler: MessageHandler) {
-  const handlers = listeners.get(feedKey);
-  if (handlers) {
-    handlers.delete(handler);
-    if (handlers.size === 0) {
-      listeners.delete(feedKey);
-      if (client) {
-        const { username } = getConfig();
-        client.unsubscribe(`${username}/feeds/${feedKey}`);
+export function unsubscribeFromFeed(
+  credentials: AIOCredentials,
+  feedKey: string,
+  handler: MessageHandler
+) {
+  const clientKey = credentials.username;
+  const userListeners = listeners.get(clientKey);
+  if (userListeners) {
+    const handlers = userListeners.get(feedKey);
+    if (handlers) {
+      handlers.delete(handler);
+      if (handlers.size === 0) {
+        userListeners.delete(feedKey);
+        const client = clients.get(clientKey);
+        if (client) {
+          client.unsubscribe(`${credentials.username}/feeds/${feedKey}`);
+        }
+        // Clean up empty user map
+        if (userListeners.size === 0) {
+          listeners.delete(clientKey);
+        }
       }
     }
   }
 }
 
 /** Publish a value to a feed (e.g. send pump ON/OFF command) */
-export function publishToFeed(feedKey: string, value: string) {
-  const mqttClient = connectMqtt();
-  const { username } = getConfig();
-  const topic = `${username}/feeds/${feedKey}`;
+export function publishToFeed(
+  credentials: AIOCredentials,
+  feedKey: string,
+  value: string
+) {
+  const mqttClient = connectMqtt(credentials);
+  const topic = `${credentials.username}/feeds/${feedKey}`;
 
   mqttClient.publish(topic, value, (err?: Error | null) => {
     if (err) {
@@ -110,12 +134,14 @@ export function publishToFeed(feedKey: string, value: string) {
   });
 }
 
-/** Disconnect the MQTT client */
-export function disconnectMqtt() {
+/** Disconnect a user's MQTT client */
+export function disconnectMqtt(credentials: AIOCredentials) {
+  const clientKey = credentials.username;
+  const client = clients.get(clientKey);
   if (client) {
     client.end();
-    client = null;
-    listeners.clear();
-    console.log("[MQTT] Disconnected from Adafruit IO");
+    clients.delete(clientKey);
+    listeners.delete(clientKey);
+    console.log(`[MQTT] Disconnected ${credentials.username} from Adafruit IO`);
   }
 }
