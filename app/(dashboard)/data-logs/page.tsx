@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { ChevronLeft, ChevronRight, Thermometer, Droplets, Sprout, RefreshCw, Wifi } from "lucide-react";
 import { apiCall } from "@/lib/api";
 import { useZones } from "@/hooks/use-zones";
+import type { IrrigationProfile } from "@/models/irrigation-profile";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -20,20 +21,27 @@ type SensorLog = {
 
 const PAGE_SIZE = 15;
 
-// ─── Status thresholds (frontend only — no status field in DB) ───────────────
+// ─── Status thresholds — derived from the zone's assigned irrigation profile ──
 
-function getStatus(log: SensorLog): "normal" | "warning" | "critical" {
-    const { soilMoisture: s } = log;
-    if (s !== null && s < 15) return "critical";
-    if (s !== null && s < 50) return "warning";
-    return "normal";
+type LogStatus = "normal" | "critical" | "no-profile";
+
+function getStatus(log: SensorLog, profile: IrrigationProfile | null): LogStatus {
+    if (!profile || log.soilMoisture === null) return "no-profile";
+    const s = log.soilMoisture;
+    return s >= profile.minMoisture && s <= profile.maxMoisture ? "normal" : "critical";
 }
 
-const STATUS_BADGE = {
+const STATUS_BADGE: Record<LogStatus, string> = {
     normal: "bg-emerald-100 text-emerald-700",
-    warning: "bg-amber-100 text-amber-700",
     critical: "bg-red-100 text-red-700",
-} as const;
+    "no-profile": "bg-gray-100 text-gray-400",
+};
+
+const STATUS_LABEL: Record<LogStatus, string> = {
+    normal: "Normal",
+    critical: "Critical",
+    "no-profile": "No Profile",
+};
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -63,9 +71,11 @@ export default function DataLogsPage() {
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
     const [liveConnected, setLiveConnected] = useState<boolean>(false);
+    const [profiles, setProfiles] = useState<IrrigationProfile[]>([]);
 
     useEffect(() => {
         document.title = "BK-IRRIGATION | Data Logs";
+        apiCall<IrrigationProfile[]>("/api/profiles").then(setProfiles).catch(() => {});
     }, []);
 
     // Initialize activeZoneId once zones are available from context
@@ -150,6 +160,9 @@ export default function DataLogsPage() {
         setPage(1);
     };
 
+    const activeZone = zones.find(z => z.id === activeZoneId);
+    const activeProfile = profiles.find(p => p.id === activeZone?.profileId) ?? null;
+
     return (
         <div className="h-full flex flex-col text-[#333] font-sans">
             {/* Page Title */}
@@ -232,7 +245,7 @@ export default function DataLogsPage() {
                                         </tr>
                                     )}
                                     {pageData.map((log, idx) => {
-                                        const status = getStatus(log);
+                                        const status = getStatus(log, activeProfile);
                                         return (
                                             <tr key={log.id} className="hover:bg-[#fafafa] transition-colors">
                                                 <td className="px-4 py-2.5 w-8 text-gray-400">{(page - 1) * PAGE_SIZE + idx + 1}</td>
@@ -248,7 +261,7 @@ export default function DataLogsPage() {
                                                 </td>
                                                 <td className="px-4 py-2.5 w-28">
                                                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${STATUS_BADGE[status]}`}>
-                                                        {status}
+                                                        {STATUS_LABEL[status]}
                                                     </span>
                                                 </td>
                                             </tr>
