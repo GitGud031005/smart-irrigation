@@ -2,8 +2,8 @@ import prisma from '../lib/prisma'
 
 const WITH_SLOTS = { timeSlots: true } as const
 
-export async function listSchedules() {
-	return prisma.schedule.findMany({ include: WITH_SLOTS, orderBy: { name: 'asc' } })
+export async function listSchedules(userId: string) {
+	return prisma.schedule.findMany({ where: { userId }, include: WITH_SLOTS, orderBy: { name: 'asc' } })
 }
 
 export async function getSchedule(id: string) {
@@ -12,11 +12,13 @@ export async function getSchedule(id: string) {
 
 export async function createSchedule(data: {
 	name: string
+	userId: string
 	timeSlots?: { startTime: string; days: string[]; duration: number }[]
 }) {
 	return prisma.schedule.create({
 		data: {
 			name: data.name,
+			userId: data.userId,
 			timeSlots: data.timeSlots?.length
 				? { create: data.timeSlots.map((s) => ({ startTime: s.startTime, days: s.days, duration: s.duration })) }
 				: undefined,
