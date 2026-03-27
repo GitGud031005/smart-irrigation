@@ -6,6 +6,7 @@ import type { Zone } from "@/models/zone";
 import type { IrrigationProfile as Profile } from "@/models/irrigation-profile";
 import type { Schedule } from "@/models/schedule";
 import { apiCall } from "@/lib/api";
+import { useZones } from "@/hooks/use-zones";
 
 
 const PAGE_SIZE = 15;
@@ -243,7 +244,7 @@ function AddZoneModal({ profiles, schedules, onClose, onAdd }: AddZoneModalProps
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ZonesPage() {
-  const [zones,        setZones]        = useState<Zone[]>([]);
+  const { zones, setZones, refetchZones } = useZones();
   const [profiles,     setProfiles]     = useState<Profile[]>([]);
   const [schedules,    setSchedules]    = useState<Schedule[]>([]);
   const [deviceCounts, setDeviceCounts] = useState<Record<string, number>>({});
@@ -261,13 +262,11 @@ export default function ZonesPage() {
     setLoading(true);
     setError(null);
     try {
-      const [zonesData, profilesData, schedulesData, devicesData] = await Promise.all([
-        apiCall<Zone[]>('/api/zones'),
+      const [profilesData, schedulesData, devicesData] = await Promise.all([
         apiCall<Profile[]>('/api/profiles'),
         apiCall<Schedule[]>('/api/schedules'),
         apiCall<{ id: string; zoneId: string | null }[]>('/api/devices'),
       ]);
-      setZones(zonesData);
       setProfiles(profilesData);
       setSchedules(schedulesData);
       // Count devices per zone
@@ -295,13 +294,13 @@ export default function ZonesPage() {
   const handleSave = (id: string, data: Partial<Zone>) => {
     setZones(prev => prev.map(z => z.id === id ? { ...z, ...data } : z));
     apiCall(`/api/zones/${id}`, { method: 'PUT', body: JSON.stringify(data) })
-      .catch(() => { loadAll(); });
+      .catch(() => { refetchZones(); loadAll(); });
   };
 
   const handleDelete = (id: string) => {
     setZones(prev => prev.filter(z => z.id !== id));
     apiCall(`/api/zones/${id}`, { method: 'DELETE' })
-      .catch(() => { loadAll(); });
+      .catch(() => { refetchZones(); loadAll(); });
   };
 
   const handleAdd = (data: Omit<Zone, 'id'>) => {

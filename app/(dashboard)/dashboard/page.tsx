@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Thermometer, Droplets, Sprout, Power } from "lucide-react";
 import { apiCall } from "@/lib/api";
-import type { Zone } from "@/models/zone";
+import { useZones } from "@/hooks/use-zones";
 import type { IrrigationProfile } from "@/models/irrigation-profile";
 import {
   Chart as ChartJS,
@@ -30,31 +30,42 @@ type SensorReading = {
 
 type SensorSnapshot = { temperature: number | null; humidity: number | null; soilMoisture: number | null; zoneId: string };
 
-type Device = {
-  id: string;
-  deviceType: string | null;
-  zoneId: string | null;
-  status: string;
-};
+type SensorStatuses = { temperature: string | null; humidity: string | null; soilMoisture: string | null };
+
+function SensorStatusDot({ status }: { status: string | null }) {
+  if (!status) return <span className="text-[10px] text-gray-300">—</span>;
+  const active = status === "ACTIVE";
+  return (
+    <span className={`flex items-center gap-1 text-[10px] font-medium ${active ? "text-emerald-500" : "text-gray-400"}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${active ? "bg-emerald-400 animate-pulse" : "bg-gray-300"}`} />
+      {active ? "Active" : "Offline"}
+    </span>
+  );
+}
 
 // Get color classes based on soil moisture value and profile thresholds
 function soilColorClasses(val: number | null | undefined, minMoisture: number = 40, maxMoisture: number = 60) {
-  if (val == null) return { text: "text-gray-400", bar: "bg-gray-300" };
+  if (val == null) return { text: "text-gray-400", bar: "bg-gray-400" };
   if (val >= maxMoisture) return { text: "text-emerald-600", bar: "bg-emerald-500" };
   if (val < minMoisture)  return { text: "text-rose-600", bar: "bg-rose-500" };
   return { text: "text-slate-500", bar: "bg-slate-400" };
 }
 
 export default function DashboardPage() {
+  const { zones, relayByZone, soilByZone, updateRelayStatus, updateSoilMoisture } = useZones();
   const [timeFilter, setTimeFilter] = useState<"daily" | "weekly">("daily");
-  const [zones, setZones] = useState<Zone[]>([]);
   const [profiles, setProfiles] = useState<IrrigationProfile[]>([]);
   const [currentZoneId, setCurrentZoneId] = useState<string | null>(null);
-  const [pumpState, setPumpState] = useState<boolean>(false);
-  const [relayDeviceId, setRelayDeviceId] = useState<string | null>(null);
   const [initialData, setInitialData] = useState<SensorSnapshot | null>(null);
   const [liveData, setLiveData] = useState<SensorSnapshot | null>(null);
   const [historyReadings, setHistoryReadings] = useState<SensorReading[]>([]);
+  const [sensorStatuses, setSensorStatuses] = useState<SensorStatuses>({ temperature: null, humidity: null, soilMoisture: null });
+  const sensorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Relay device for the currently selected zone (from context)
+  const currentRelay = currentZoneId ? relayByZone[currentZoneId] ?? null : null;
+  const relayDeviceId = currentRelay?.id ?? null;
+  const pumpState = currentRelay?.status === "ACTIVE";
 
   // Displayed snapshot: prefer MQTT live data for current zone, fall back to last DB reading
   const displayData =
@@ -73,21 +84,39 @@ export default function DashboardPage() {
     document.title = `BK-IRRIGATION | Dashboard${currentZone ? ` - ${currentZone.name}` : ""}`;
   }, [currentZone]);
 
-  // Fetch zones and profiles on mount
+  // Initialize currentZoneId from context zones (once available)
   useEffect(() => {
-    Promise.all([
-      apiCall<Zone[]>("/api/zones"),
-      apiCall<IrrigationProfile[]>("/api/profiles"),
-    ])
-      .then(([zonData, profData]) => {
-        setZones(zonData);
-        setProfiles(profData);
-        if (zonData.length > 0) setCurrentZoneId(zonData[0].id);
-      })
+    if (zones.length > 0 && currentZoneId === null) {
+      setCurrentZoneId(zones[0].id);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zones]);
+
+  // Fetch profiles on mount
+  useEffect(() => {
+    apiCall<IrrigationProfile[]>("/api/profiles")
+      .then(setProfiles)
       .catch(() => {});
   }, []);
 
-  // When zone changes: load last DB reading + relay device
+  // When zone changes: load sensor device statuses from DB
+  useEffect(() => {
+    if (!currentZoneId) return;
+    setSensorStatuses({ temperature: null, humidity: null, soilMoisture: null });
+    apiCall<Array<{ deviceType: string; status: string }>>(`/api/devices?zoneId=${encodeURIComponent(currentZoneId)}`)
+      .then(devices => {
+        const s: SensorStatuses = { temperature: null, humidity: null, soilMoisture: null };
+        for (const d of devices) {
+          if (d.deviceType === "DHT20_TEMPERATURE_SENSOR") s.temperature = d.status;
+          if (d.deviceType === "DHT20_HUMIDITY_SENSOR")    s.humidity    = d.status;
+          if (d.deviceType === "SOIL_MOISTURE_SENSOR")     s.soilMoisture = d.status;
+        }
+        setSensorStatuses(s);
+      })
+      .catch(() => {});
+  }, [currentZoneId]);
+
+  // When zone changes: load last DB reading
   useEffect(() => {
     if (!currentZoneId) return;
 
@@ -100,17 +129,6 @@ export default function DashboardPage() {
         setInitialData({ temperature: r.temperature, humidity: r.humidity, soilMoisture: r.soilMoisture, zoneId: currentZoneId });
       }
     }).catch(() => {});
-
-    // 2. Relay device for this zone
-    apiCall<Device[]>(`/api/devices?zoneId=${encodeURIComponent(currentZoneId)}&deviceType=RELAY_MODULE`)
-      .then((devices) => {
-        if (devices.length > 0) {
-          const relay = devices[0];
-          setRelayDeviceId(relay.id);
-          setPumpState(relay.status === "ACTIVE");
-        }
-      })
-      .catch(() => {});
   }, [currentZoneId]);
 
   // Fetch historical readings when zone or time-filter changes
@@ -139,26 +157,37 @@ export default function DashboardPage() {
           soilMoisture: data.soilMoisture ?? null,
           zoneId: currentZoneId,
         });
+        // push live soil moisture into context so zone cards show up-to-date values
+        if (data.soilMoisture != null) updateSoilMoisture(currentZoneId, data.soilMoisture);
+        // mark sensor devices active; reset 10s inactivity timer
+        setSensorStatuses({ temperature: "ACTIVE", humidity: "ACTIVE", soilMoisture: "ACTIVE" });
+        if (sensorTimerRef.current) clearTimeout(sensorTimerRef.current);
+        sensorTimerRef.current = setTimeout(() => {
+          setSensorStatuses({ temperature: "OFFLINE", humidity: "OFFLINE", soilMoisture: "OFFLINE" });
+        }, 10_000);
       } catch {
         // ignore malformed frames
       }
     };
-    return () => source.close();
-  }, [currentZoneId]);
+    return () => {
+      source.close();
+      if (sensorTimerRef.current) clearTimeout(sensorTimerRef.current);
+    };
+  }, [currentZoneId, updateSoilMoisture]);
 
   // Pump handlers
   const togglePump = async () => {
-    if (!relayDeviceId) return;
-    const newState = !pumpState;
-    setPumpState(newState);
+    if (!relayDeviceId || !currentZoneId) return;
+    const newStatus = pumpState ? "OFFLINE" : "ACTIVE";
+    updateRelayStatus(currentZoneId, newStatus); // optimistic
     try {
       await apiCall(`/api/devices/${encodeURIComponent(relayDeviceId)}`, {
         method: "PUT",
-        body: JSON.stringify({ status: newState ? "ACTIVE" : "OFFLINE" }),
+        body: JSON.stringify({ status: newStatus }),
       });
     } catch {
       // revert on failure
-      setPumpState(!newState);
+      updateRelayStatus(currentZoneId, pumpState ? "ACTIVE" : "OFFLINE");
     }
   };
 
@@ -255,11 +284,14 @@ export default function DashboardPage() {
           {zones.length === 0 ? (
             <div className="p-4 text-sm text-gray-400">No zones available.</div>
           ) : (
-            <div className="overflow-x-auto">
-              <div className="flex divide-x divide-gray-100">
+            <div className="flex overflow-x-auto scrollbar-zone divide-x divide-gray-100">
                 {zones.map(zone => {
                   const isActive = zone.id === currentZoneId;
-                  const soil = isActive ? (displayData?.soilMoisture ?? null) : null;
+                  const isIrrigating = relayByZone[zone.id]?.status === "ACTIVE";
+                  // Active zone: prefer live/initial data; other zones: use context soil
+                  const soil = isActive
+                    ? (displayData?.soilMoisture ?? soilByZone[zone.id] ?? null)
+                    : (soilByZone[zone.id] ?? null);
                   const profile = findProfile(zone.profileId);
                   const minMoisture = profile?.minMoisture ?? 40;
                   const maxMoisture = profile?.maxMoisture ?? 60;
@@ -268,21 +300,27 @@ export default function DashboardPage() {
                     <div
                       key={zone.id}
                       onClick={() => setCurrentZoneId(zone.id)}
-                      className={`w-40 shrink-0 p-3 cursor-pointer transition-colors border-l-4 ${isActive ? "bg-[#f5f5f5] border-l-[#00695c]" : "border-l-transparent hover:bg-gray-50"}`}
+                      className={`min-w-[25%] shrink-0 p-3 cursor-pointer transition-colors border-l-4 ${
+                        isActive
+                          ? "bg-[#f5f5f5] border-l-[#00695c]"
+                          : isIrrigating
+                          ? "bg-blue-50 border-l-blue-400 hover:bg-blue-100"
+                          : "border-l-transparent hover:bg-gray-50"
+                      }`}
                     >
                       <div className="flex justify-between items-end mb-2">
-                        <span className="text-sm font-bold text-slate-700 truncate mr-1">{zone.name}</span>
-                        <span className={`text-xs font-bold shrink-0 ${text}`}>
+                        <span className={`text-sm font-bold truncate mr-1 ${isIrrigating ? "text-blue-700" : "text-slate-700"}`}>{zone.name}</span>
+                        <span className={`text-xs font-bold shrink-0 ${isIrrigating ? "text-blue-700" : text}`}>
                           {soil != null ? `${soil.toFixed(0)}%` : "--"}
                         </span>
                       </div>
-                      <div className="w-full bg-gray-100 h-1 rounded-sm overflow-hidden">
-                        <div className={`${bar} h-full`} style={{ width: soil != null ? `${Math.min(100, soil)}%` : "0%" }}></div>
+                      
+                      <div className="w-full bg-gray-300 h-1 rounded-sm overflow-hidden">
+                        <div className={`${isIrrigating ? "bg-blue-700" : bar} h-full`} style={{ width: soil != null ? `${Math.min(100, soil)}%` : "0%" }}></div>
                       </div>
                     </div>
                   );
                 })}
-              </div>
             </div>
           )}
         </div>
@@ -294,33 +332,42 @@ export default function DashboardPage() {
         <div className="flex-1 flex flex-col gap-4 space-y-4 overflow-y-auto min-h-0">
           
           {/* Stat Cards */}
-          <div className="flex-1 bg-white rounded-sm shadow-sm border border-[#e0e0e0] p-4 mb-0">
+          <div className="relative flex-1 bg-white rounded-sm shadow-sm border border-[#e0e0e0] p-4 mb-0">
             <div className="flex items-center gap-2 mb-3">
               <Thermometer className="w-6 h-6 text-orange-500" />
-              <span className="text-sm color-[#666] font-medium uppercase">Temperature <span className="text-xs block normal-case font-normal text-gray-400">Last update just now</span></span>
+              <span className="text-sm color-[#666] font-medium uppercase">Temperature</span>
             </div>
             <div className="text-[32px] font-normal text-orange-600">
               {displayData?.temperature != null ? displayData.temperature.toFixed(1) : "--"} <span className="text-lg">°C</span>
             </div>
+            <div className="absolute bottom-3 right-3">
+              <SensorStatusDot status={sensorStatuses.temperature} />
+            </div>
           </div>
           
-          <div className="flex-1 bg-white rounded-sm shadow-sm border border-[#e0e0e0] p-4 mb-0">
+          <div className="relative flex-1 bg-white rounded-sm shadow-sm border border-[#e0e0e0] p-4 mb-0">
             <div className="flex items-center gap-2 mb-3">
               <Droplets className="w-6 h-6 text-blue-500" />
-              <span className="text-sm color-[#666] font-medium uppercase">Humidity <span className="text-xs block normal-case font-normal text-gray-400">Last update just now</span></span>
+              <span className="text-sm color-[#666] font-medium uppercase">Humidity</span>
             </div>
             <div className="text-[32px] font-normal text-blue-600">
               {displayData?.humidity != null ? displayData.humidity.toFixed(0) : "--"} <span className="text-lg">%</span>
             </div>
+            <div className="absolute bottom-3 right-3">
+              <SensorStatusDot status={sensorStatuses.humidity} />
+            </div>
           </div>
           
-          <div className="flex-1 bg-white rounded-sm shadow-sm border border-[#e0e0e0] p-4 mb-0">
+          <div className="relative flex-1 bg-white rounded-sm shadow-sm border border-[#e0e0e0] p-4 mb-0">
             <div className="flex items-center gap-2 mb-3">
               <Sprout className="w-6 h-6 text-emerald-500" />
-              <span className="text-sm color-[#666] font-medium uppercase">Soil Moisture <span className="text-xs block normal-case font-normal text-gray-400">Last update just now</span></span>
+              <span className="text-sm color-[#666] font-medium uppercase">Soil Moisture</span>
             </div>
             <div className="text-[32px] font-normal text-emerald-600">
               {displayData?.soilMoisture != null ? displayData.soilMoisture.toFixed(0) : "--"} <span className="text-lg">%</span>
+            </div>
+            <div className="absolute bottom-3 right-3">
+              <SensorStatusDot status={sensorStatuses.soilMoisture} />
             </div>
           </div>
         </div>

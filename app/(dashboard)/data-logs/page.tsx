@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { ChevronLeft, ChevronRight, Thermometer, Droplets, Sprout, RefreshCw, Wifi } from "lucide-react";
 import { apiCall } from "@/lib/api";
-import type { Zone } from "@/models/zone";
+import { useZones } from "@/hooks/use-zones";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -56,7 +56,7 @@ function getVisiblePages(current: number, total: number): (number | string)[] {
 // ─── Page component ──────────────────────────────────────────────────────────
 
 export default function DataLogsPage() {
-    const [zones, setZones] = useState<Zone[]>([]);
+    const { zones } = useZones();
     const [activeZoneId, setActiveZoneId] = useState<string | null>(null);
     const [page, setPage] = useState<number>(1);
     const [logs, setLogs] = useState<SensorLog[]>([]);
@@ -68,15 +68,13 @@ export default function DataLogsPage() {
         document.title = "BK-IRRIGATION | Data Logs";
     }, []);
 
-    // Fetch zones on mount
+    // Initialize activeZoneId once zones are available from context
     useEffect(() => {
-        apiCall<Zone[]>("/api/zones")
-            .then((data) => {
-                setZones(data);
-                if (data.length > 0) setActiveZoneId(data[0].id);
-            })
-            .catch(() => {});
-    }, []);
+        if (zones.length > 0 && activeZoneId === null) {
+            setActiveZoneId(zones[0].id);
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [zones]);
 
     // When active zone changes: sync from Adafruit then load history
     useEffect(() => {
@@ -174,12 +172,12 @@ export default function DataLogsPage() {
             </div>
 
             {/* Zone Tabs */}
-            <div className="mb-0 shrink-0 flex border-b border-[#e0e0e0]">
+            <div className="mb-0 shrink-0 flex overflow-x-auto border-b border-[#e0e0e0] scrollbar-zone">
                 {zones.map((zone) => (
                     <button
                         key={zone.id}
                         onClick={() => handleZoneChange(zone.id)}
-                        className={`flex-1 py-2.5 text-[12px] font-bold uppercase tracking-wide transition-colors border-b-2 ${activeZoneId === zone.id
+                        className={`shrink-0 min-w-[25%] p-2.5 text-[12px] font-bold uppercase tracking-wide truncate transition-colors border-b-2 ${activeZoneId === zone.id
                                 ? "border-[#00695c] text-[#00695c] bg-white"
                                 : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50"
                             }`}

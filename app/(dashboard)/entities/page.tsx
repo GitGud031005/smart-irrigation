@@ -3,6 +3,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { Plus, Settings, Trash2, X, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
 import { apiCall } from "@/lib/api";
+import { useZones } from "@/hooks/use-zones";
+import type { Zone } from "@/models/zone";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -23,11 +25,6 @@ type Device = {
   zoneId: string | null;
   status: DeviceStatus;
   lastActiveAt: string | null;
-};
-
-type Zone = {
-  id: string;
-  name: string;
 };
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -346,9 +343,9 @@ function AddDeviceModal({ zones, onClose, onAdd }: AddDeviceModalProps) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function EntitiesPage() {
+  const { zones } = useZones();
   const [activeZoneIdx,  setActiveZoneIdx]  = useState(0);
   const [devices,        setDevices]        = useState<Device[]>([]);
-  const [zones,          setZones]          = useState<Zone[]>([]);
   const [loading,        setLoading]        = useState(true);
   const [error,          setError]          = useState<string | null>(null);
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
@@ -372,19 +369,8 @@ export default function EntitiesPage() {
     }
   };
 
-  const loadZones = async () => {
-    try {
-      const data = await apiCall<Zone[]>("/api/zones");
-      setZones(data);
-    } catch (err) {
-      // Zones loading failure should not block devices display
-      console.error("Failed to load zones:", err);
-    }
-  };
-
   useEffect(() => {
     loadDevices();
-    loadZones();
   }, []);
 
   // Filter devices by selected zone tab
@@ -437,7 +423,7 @@ export default function EntitiesPage() {
       </div>
 
       {/* Zone Tabs */}
-      <div className="shrink-0 flex border-b border-[#e0e0e0]">
+      <div className="shrink-0 flex overflow-x-auto border-b border-[#e0e0e0] scrollbar-zone">
         {zones.length === 0 ? (
           <div className="flex-1 py-2.5 text-[12px] text-gray-300 text-center">
             {loading ? 'Loading zones…' : 'No zones found'}
@@ -447,7 +433,7 @@ export default function EntitiesPage() {
             <button
               key={zone.id}
               onClick={() => { setActiveZoneIdx(idx); setPage(1); }}
-              className={`flex-1 py-2.5 text-[12px] font-bold uppercase tracking-wide transition-colors border-b-2 ${
+              className={`shrink-0 min-w-[25%] py-2.5 text-[12px] font-bold uppercase tracking-wide transition-colors border-b-2 ${
                 activeZoneIdx === idx
                   ? "border-[#00695c] text-[#00695c] bg-white"
                   : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50"
