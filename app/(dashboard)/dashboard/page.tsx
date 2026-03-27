@@ -30,31 +30,27 @@ type SensorReading = {
 
 type SensorSnapshot = { temperature: number | null; humidity: number | null; soilMoisture: number | null; zoneId: string };
 
-type Device = {
-  id: string;
-  deviceType: string | null;
-  zoneId: string | null;
-  status: string;
-};
-
 // Get color classes based on soil moisture value and profile thresholds
 function soilColorClasses(val: number | null | undefined, minMoisture: number = 40, maxMoisture: number = 60) {
-  if (val == null) return { text: "text-gray-400", bar: "bg-gray-300" };
+  if (val == null) return { text: "text-gray-400", bar: "bg-gray-400" };
   if (val >= maxMoisture) return { text: "text-emerald-600", bar: "bg-emerald-500" };
   if (val < minMoisture)  return { text: "text-rose-600", bar: "bg-rose-500" };
   return { text: "text-slate-500", bar: "bg-slate-400" };
 }
 
 export default function DashboardPage() {
-  const { zones } = useZones();
+  const { zones, relayByZone, soilByZone, updateRelayStatus, updateSoilMoisture } = useZones();
   const [timeFilter, setTimeFilter] = useState<"daily" | "weekly">("daily");
   const [profiles, setProfiles] = useState<IrrigationProfile[]>([]);
   const [currentZoneId, setCurrentZoneId] = useState<string | null>(null);
-  const [pumpState, setPumpState] = useState<boolean>(false);
-  const [relayDeviceId, setRelayDeviceId] = useState<string | null>(null);
   const [initialData, setInitialData] = useState<SensorSnapshot | null>(null);
   const [liveData, setLiveData] = useState<SensorSnapshot | null>(null);
   const [historyReadings, setHistoryReadings] = useState<SensorReading[]>([]);
+
+  // Relay device for the currently selected zone (from context)
+  const currentRelay = currentZoneId ? relayByZone[currentZoneId] ?? null : null;
+  const relayDeviceId = currentRelay?.id ?? null;
+  const pumpState = currentRelay?.status === "ACTIVE";
 
   // Displayed snapshot: prefer MQTT live data for current zone, fall back to last DB reading
   const displayData =
@@ -101,17 +97,6 @@ export default function DashboardPage() {
         setInitialData({ temperature: r.temperature, humidity: r.humidity, soilMoisture: r.soilMoisture, zoneId: currentZoneId });
       }
     }).catch(() => {});
-
-    // 2. Relay device for this zone
-    apiCall<Device[]>(`/api/devices?zoneId=${encodeURIComponent(currentZoneId)}&deviceType=RELAY_MODULE`)
-      .then((devices) => {
-        if (devices.length > 0) {
-          const relay = devices[0];
-          setRelayDeviceId(relay.id);
-          setPumpState(relay.status === "ACTIVE");
-        }
-      })
-      .catch(() => {});
   }, [currentZoneId]);
 
   // Fetch historical readings when zone or time-filter changes
@@ -140,26 +125,28 @@ export default function DashboardPage() {
           soilMoisture: data.soilMoisture ?? null,
           zoneId: currentZoneId,
         });
+        // push live soil moisture into context so zone cards show up-to-date values
+        if (data.soilMoisture != null) updateSoilMoisture(currentZoneId, data.soilMoisture);
       } catch {
         // ignore malformed frames
       }
     };
     return () => source.close();
-  }, [currentZoneId]);
+  }, [currentZoneId, updateSoilMoisture]);
 
   // Pump handlers
   const togglePump = async () => {
-    if (!relayDeviceId) return;
-    const newState = !pumpState;
-    setPumpState(newState);
+    if (!relayDeviceId || !currentZoneId) return;
+    const newStatus = pumpState ? "OFFLINE" : "ACTIVE";
+    updateRelayStatus(currentZoneId, newStatus); // optimistic
     try {
       await apiCall(`/api/devices/${encodeURIComponent(relayDeviceId)}`, {
         method: "PUT",
-        body: JSON.stringify({ status: newState ? "ACTIVE" : "OFFLINE" }),
+        body: JSON.stringify({ status: newStatus }),
       });
     } catch {
       // revert on failure
-      setPumpState(!newState);
+      updateRelayStatus(currentZoneId, pumpState ? "ACTIVE" : "OFFLINE");
     }
   };
 
@@ -256,11 +243,14 @@ export default function DashboardPage() {
           {zones.length === 0 ? (
             <div className="p-4 text-sm text-gray-400">No zones available.</div>
           ) : (
-            <div className="overflow-x-auto">
-              <div className="flex divide-x divide-gray-100">
+            <div className="flex overflow-x-auto scrollbar-zone divide-x divide-gray-100">
                 {zones.map(zone => {
                   const isActive = zone.id === currentZoneId;
-                  const soil = isActive ? (displayData?.soilMoisture ?? null) : null;
+                  const isIrrigating = relayByZone[zone.id]?.status === "ACTIVE";
+                  // Active zone: prefer live/initial data; other zones: use context soil
+                  const soil = isActive
+                    ? (displayData?.soilMoisture ?? soilByZone[zone.id] ?? null)
+                    : (soilByZone[zone.id] ?? null);
                   const profile = findProfile(zone.profileId);
                   const minMoisture = profile?.minMoisture ?? 40;
                   const maxMoisture = profile?.maxMoisture ?? 60;
@@ -269,21 +259,27 @@ export default function DashboardPage() {
                     <div
                       key={zone.id}
                       onClick={() => setCurrentZoneId(zone.id)}
-                      className={`w-40 shrink-0 p-3 cursor-pointer transition-colors border-l-4 ${isActive ? "bg-[#f5f5f5] border-l-[#00695c]" : "border-l-transparent hover:bg-gray-50"}`}
+                      className={`min-w-[25%] shrink-0 p-3 cursor-pointer transition-colors border-l-4 ${
+                        isActive
+                          ? "bg-[#f5f5f5] border-l-[#00695c]"
+                          : isIrrigating
+                          ? "bg-blue-50 border-l-blue-400 hover:bg-blue-100"
+                          : "border-l-transparent hover:bg-gray-50"
+                      }`}
                     >
                       <div className="flex justify-between items-end mb-2">
-                        <span className="text-sm font-bold text-slate-700 truncate mr-1">{zone.name}</span>
-                        <span className={`text-xs font-bold shrink-0 ${text}`}>
+                        <span className={`text-sm font-bold truncate mr-1 ${isIrrigating ? "text-blue-700" : "text-slate-700"}`}>{zone.name}</span>
+                        <span className={`text-xs font-bold shrink-0 ${isIrrigating ? "text-blue-700" : text}`}>
                           {soil != null ? `${soil.toFixed(0)}%` : "--"}
                         </span>
                       </div>
-                      <div className="w-full bg-gray-100 h-1 rounded-sm overflow-hidden">
-                        <div className={`${bar} h-full`} style={{ width: soil != null ? `${Math.min(100, soil)}%` : "0%" }}></div>
+                      
+                      <div className="w-full bg-gray-300 h-1 rounded-sm overflow-hidden">
+                        <div className={`${isIrrigating ? "bg-blue-700" : bar} h-full`} style={{ width: soil != null ? `${Math.min(100, soil)}%` : "0%" }}></div>
                       </div>
                     </div>
                   );
                 })}
-              </div>
             </div>
           )}
         </div>

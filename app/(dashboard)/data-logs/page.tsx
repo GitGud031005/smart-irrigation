@@ -172,12 +172,12 @@ export default function DataLogsPage() {
             </div>
 
             {/* Zone Tabs */}
-            <div className="mb-0 shrink-0 flex border-b border-[#e0e0e0]">
+            <div className="mb-0 shrink-0 flex overflow-x-auto border-b border-[#e0e0e0] scrollbar-zone">
                 {zones.map((zone) => (
                     <button
                         key={zone.id}
                         onClick={() => handleZoneChange(zone.id)}
-                        className={`flex-1 py-2.5 text-[12px] font-bold uppercase tracking-wide transition-colors border-b-2 ${activeZoneId === zone.id
+                        className={`shrink-0 min-w-[25%] p-2.5 text-[12px] font-bold uppercase tracking-wide truncate transition-colors border-b-2 ${activeZoneId === zone.id
                                 ? "border-[#00695c] text-[#00695c] bg-white"
                                 : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50"
                             }`}

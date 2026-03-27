@@ -423,7 +423,7 @@ export default function EntitiesPage() {
       </div>
 
       {/* Zone Tabs */}
-      <div className="shrink-0 flex border-b border-[#e0e0e0]">
+      <div className="shrink-0 flex overflow-x-auto border-b border-[#e0e0e0] scrollbar-zone">
         {zones.length === 0 ? (
           <div className="flex-1 py-2.5 text-[12px] text-gray-300 text-center">
             {loading ? 'Loading zones…' : 'No zones found'}
@@ -433,7 +433,7 @@ export default function EntitiesPage() {
             <button
               key={zone.id}
               onClick={() => { setActiveZoneIdx(idx); setPage(1); }}
-              className={`flex-1 py-2.5 text-[12px] font-bold uppercase tracking-wide transition-colors border-b-2 ${
+              className={`shrink-0 min-w-[25%] py-2.5 text-[12px] font-bold uppercase tracking-wide transition-colors border-b-2 ${
                 activeZoneIdx === idx
                   ? "border-[#00695c] text-[#00695c] bg-white"
                   : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50"
