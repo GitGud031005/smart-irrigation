@@ -5,7 +5,7 @@
 
 import { NextRequest } from "next/server";
 import { subscribeToFeed, unsubscribeFromFeed } from "@/lib/mqtt";
-import { getDeviceInZone, updateDevice } from "@/services/device-service";
+import { getDeviceInZone } from "@/services/device-service";
 import { getZone } from "@/services/zone-service";
 import { verifyToken, COOKIE_NAME } from "@/lib/auth";
 import { getUserById } from "@/services/auth-service";
@@ -64,16 +64,7 @@ export async function GET(request: NextRequest) {
     humidity: humDevice.feedKey,
   };
 
-  const deviceIds = [soilDevice.id, tempDevice.id, humDevice.id];
-
   const INACTIVITY_MS = 10_000;
-
-  /** Flip all sensor devices in this zone to the given status (fire-and-forget). */
-  const setSensorStatus = (status: "ACTIVE" | "OFFLINE") => {
-    for (const id of deviceIds) {
-      updateDevice(id, { status }).catch(() => {});
-    }
-  };
 
   const encoder = new TextEncoder();
 
@@ -87,19 +78,6 @@ export async function GET(request: NextRequest) {
   let inactivityTimer: ReturnType<typeof setTimeout> | null = null;
   let isActive = false;
 
-  /** Call on every incoming data point to start/reset the 10-second inactivity window. */
-  const onActivity = () => {
-    if (!isActive) {
-      isActive = true;
-      setSensorStatus("ACTIVE");
-    }
-    if (inactivityTimer !== null) clearTimeout(inactivityTimer);
-    inactivityTimer = setTimeout(() => {
-      isActive = false;
-      setSensorStatus("OFFLINE");
-    }, INACTIVITY_MS);
-  };
-
   const stream = new ReadableStream({
     start(controller) {
       const emit = (payload: object) => {
@@ -111,6 +89,30 @@ export async function GET(request: NextRequest) {
           // Stream already closed — client disconnected
         }
       };
+
+      const emitStatus = (status: "ACTIVE" | "OFFLINE") => {
+        emit({ type: "status", temperature: status, humidity: status, soilMoisture: status });
+      };
+
+      const onActivity = () => {
+        if (!isActive) {
+          isActive = true;
+          emitStatus("ACTIVE");
+        }
+        if (inactivityTimer !== null) clearTimeout(inactivityTimer);
+        inactivityTimer = setTimeout(() => {
+          isActive = false;
+          emitStatus("OFFLINE");
+        }, INACTIVITY_MS);
+      };
+
+      // Emit initial device statuses from DB so the client reflects persisted state immediately
+      emit({
+        type: "status",
+        temperature: tempDevice.status ?? "OFFLINE",
+        humidity: humDevice.status ?? "OFFLINE",
+        soilMoisture: soilDevice.status ?? "OFFLINE",
+      });
 
       const makeHandler =
         (metric: keyof typeof buffer) => (_feedKey: string, value: string) => {
@@ -124,6 +126,7 @@ export async function GET(request: NextRequest) {
             buffer.humidity !== null
           ) {
             emit({
+              type: "reading",
               soilMoisture: buffer.soilMoisture,
               temperature: buffer.temperature,
               humidity: buffer.humidity,
@@ -148,7 +151,6 @@ export async function GET(request: NextRequest) {
     },
     cancel() {
       if (inactivityTimer !== null) clearTimeout(inactivityTimer);
-      setSensorStatus("OFFLINE");
       cleanup?.();
     },
   });

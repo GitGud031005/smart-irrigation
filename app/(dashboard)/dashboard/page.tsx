@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Thermometer, Droplets, Sprout, Power } from "lucide-react";
 import { apiCall } from "@/lib/api";
 import { useZones } from "@/hooks/use-zones";
@@ -60,7 +60,6 @@ export default function DashboardPage() {
   const [liveData, setLiveData] = useState<SensorSnapshot | null>(null);
   const [historyReadings, setHistoryReadings] = useState<SensorReading[]>([]);
   const [sensorStatuses, setSensorStatuses] = useState<SensorStatuses>({ temperature: null, humidity: null, soilMoisture: null });
-  const sensorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Relay device for the currently selected zone (from context)
   const currentRelay = currentZoneId ? relayByZone[currentZoneId] ?? null : null;
@@ -99,23 +98,6 @@ export default function DashboardPage() {
       .catch(() => {});
   }, []);
 
-  // When zone changes: load sensor device statuses from DB
-  useEffect(() => {
-    if (!currentZoneId) return;
-    setSensorStatuses({ temperature: null, humidity: null, soilMoisture: null });
-    apiCall<Array<{ deviceType: string; status: string }>>(`/api/devices?zoneId=${encodeURIComponent(currentZoneId)}`)
-      .then(devices => {
-        const s: SensorStatuses = { temperature: null, humidity: null, soilMoisture: null };
-        for (const d of devices) {
-          if (d.deviceType === "DHT20_TEMPERATURE_SENSOR") s.temperature = d.status;
-          if (d.deviceType === "DHT20_HUMIDITY_SENSOR")    s.humidity    = d.status;
-          if (d.deviceType === "SOIL_MOISTURE_SENSOR")     s.soilMoisture = d.status;
-        }
-        setSensorStatuses(s);
-      })
-      .catch(() => {});
-  }, [currentZoneId]);
-
   // When zone changes: load last DB reading
   useEffect(() => {
     if (!currentZoneId) return;
@@ -147,31 +129,32 @@ export default function DashboardPage() {
   // Subscribe to live MQTT sensor stream via SSE (reconnect when zone changes)
   useEffect(() => {
     if (!currentZoneId) return;
+    setSensorStatuses({ temperature: null, humidity: null, soilMoisture: null });
     const source = new EventSource(`/api/sensor-readings/stream?zoneId=${encodeURIComponent(currentZoneId)}`);
     source.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data as string);
-        setLiveData({
-          temperature: data.temperature ?? null,
-          humidity: data.humidity ?? null,
-          soilMoisture: data.soilMoisture ?? null,
-          zoneId: currentZoneId,
-        });
-        // push live soil moisture into context so zone cards show up-to-date values
-        if (data.soilMoisture != null) updateSoilMoisture(currentZoneId, data.soilMoisture);
-        // mark sensor devices active; reset 10s inactivity timer
-        setSensorStatuses({ temperature: "ACTIVE", humidity: "ACTIVE", soilMoisture: "ACTIVE" });
-        if (sensorTimerRef.current) clearTimeout(sensorTimerRef.current);
-        sensorTimerRef.current = setTimeout(() => {
-          setSensorStatuses({ temperature: "OFFLINE", humidity: "OFFLINE", soilMoisture: "OFFLINE" });
-        }, 10_000);
+        if (data.type === "status") {
+          setSensorStatuses({
+            temperature: data.temperature ?? null,
+            humidity: data.humidity ?? null,
+            soilMoisture: data.soilMoisture ?? null,
+          });
+        } else if (data.type === "reading") {
+          setLiveData({
+            temperature: data.temperature ?? null,
+            humidity: data.humidity ?? null,
+            soilMoisture: data.soilMoisture ?? null,
+            zoneId: currentZoneId,
+          });
+          if (data.soilMoisture != null) updateSoilMoisture(currentZoneId, data.soilMoisture);
+        }
       } catch {
         // ignore malformed frames
       }
     };
     return () => {
       source.close();
-      if (sensorTimerRef.current) clearTimeout(sensorTimerRef.current);
     };
   }, [currentZoneId, updateSoilMoisture]);
 
