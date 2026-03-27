@@ -356,11 +356,13 @@ export default function EntitiesPage() {
     document.title = "BK-IRRIGATION | Entities";
   }, []);
 
-  const loadDevices = async () => {
+  const activeZone = zones[activeZoneIdx] ?? null;
+
+  const loadDevices = async (zoneId: string) => {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiCall<Device[]>("/api/devices");
+      const data = await apiCall<Device[]>(`/api/devices?zoneId=${encodeURIComponent(zoneId)}`);
       setDevices(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
@@ -370,21 +372,15 @@ export default function EntitiesPage() {
   };
 
   useEffect(() => {
-    loadDevices();
-  }, []);
+    if (!activeZone) return;
+    loadDevices(activeZone.id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeZone?.id]);
 
-  // Filter devices by selected zone tab
-  const filteredDevices = useMemo(() => {
-    if (zones.length === 0) return devices;
-    const activeZone = zones[activeZoneIdx];
-    if (!activeZone) return devices;
-    return devices.filter(d => d.zoneId === activeZone.id);
-  }, [devices, zones, activeZoneIdx]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredDevices.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(devices.length / PAGE_SIZE));
   const pageData = useMemo(
-    () => filteredDevices.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
-    [filteredDevices, page]
+    () => devices.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [devices, page]
   );
 
   const handleSave = async (
@@ -392,17 +388,17 @@ export default function EntitiesPage() {
     data: { deviceType: DeviceType | null; feedKey: string | null; zoneId: string | null; status: DeviceStatus }
   ) => {
     await apiCall(`/api/devices/${id}`, { method: "PUT", body: JSON.stringify(data) });
-    await loadDevices();
+    if (activeZone) await loadDevices(activeZone.id);
   };
 
   const handleDelete = async (id: string) => {
     await apiCall(`/api/devices/${id}`, { method: "DELETE" });
-    await loadDevices();
+    if (activeZone) await loadDevices(activeZone.id);
   };
 
   const handleAdd = async (data: { deviceType: DeviceType | null; feedKey: string | null; zoneId: string | null; status: DeviceStatus }) => {
     await apiCall("/api/devices", { method: "POST", body: JSON.stringify(data) });
-    await loadDevices();
+    if (activeZone) await loadDevices(activeZone.id);
   };
 
   return (
@@ -511,8 +507,8 @@ export default function EntitiesPage() {
             {/* Pagination Footer */}
             <div className="shrink-0 border-t border-[#e8e8e8] px-4 py-2.5 flex items-center justify-between bg-[#f9f9f9]">
               <span className="text-[11px] text-gray-400">
-                {filteredDevices.length > 0
-                  ? `Showing ${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, filteredDevices.length)} of ${filteredDevices.length} devices`
+                {devices.length > 0
+                  ? `Showing ${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, devices.length)} of ${devices.length} devices`
                   : "No devices"}
               </span>
               <div className="flex items-center gap-1">
