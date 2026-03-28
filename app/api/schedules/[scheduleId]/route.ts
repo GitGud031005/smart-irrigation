@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSchedule, updateSchedule, deleteSchedule } from '@/services/schedule-service'
 import { toJsonSafe } from '@/lib/utils'
 import { verifyToken, COOKIE_NAME } from '@/lib/auth'
+import { validate, updateScheduleSchema } from '@/lib/validators'
 
 async function authorizeSchedule(request: NextRequest, scheduleId: string) {
 	const token = request.cookies.get(COOKIE_NAME)?.value
@@ -36,7 +37,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 	try {
 		// eslint-disable-next-line @typescript-eslint/no-unused-vars
 		const { userId: _ignored, ...rest } = body
-		const s = await updateSchedule(scheduleId, rest)
+		const v = validate(updateScheduleSchema, rest)
+		if (!v.success) return NextResponse.json({ error: v.error }, { status: 400 })
+		const s = await updateSchedule(scheduleId, v.data)
 		return new NextResponse(JSON.stringify(toJsonSafe(s)), { headers: { 'Content-Type': 'application/json' } })
 	} catch (err) {
 		const message = err instanceof Error ? err.message : 'Unknown error'

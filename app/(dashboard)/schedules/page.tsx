@@ -289,6 +289,7 @@ function SettingsModal({ schedule, onClose, onSave, onDelete }: SettingsModalPro
                     <div className="flex gap-2">
                         <button onClick={onClose} className="text-xs px-3 py-1.5 rounded border border-[#ddd] text-gray-500 hover:bg-gray-50 transition-colors">Cancel</button>
                         <button
+                            disabled={!name.trim() || slots.length === 0 || slots.some(s => s.days.length === 0)}
                             onClick={() => {
                                 if (!name.trim()) return;
                                 onSave(schedule.id, {
@@ -297,7 +298,7 @@ function SettingsModal({ schedule, onClose, onSave, onDelete }: SettingsModalPro
                                 });
                                 onClose();
                             }}
-                            className="text-xs px-3 py-1.5 rounded bg-[#00695c] text-white font-bold uppercase hover:brightness-110 transition-all"
+                            className={`text-xs px-3 py-1.5 rounded bg-[#00695c] text-white font-bold uppercase hover:brightness-110 transition-all ${!name.trim() || slots.length === 0 || slots.some(s => s.days.length === 0) ? "opacity-50 cursor-not-allowed" : ""}`}
                         >
                             Save Changes
                         </button>
@@ -389,7 +390,7 @@ function AddScheduleModal({ onClose, onAdd }: AddScheduleModalProps) {
                 <div className="border-t border-[#eee] py-3 px-4 flex justify-end gap-2 shrink-0">
                     <button onClick={onClose} className="text-xs px-3 py-1.5 rounded border border-[#ddd] text-gray-500 hover:bg-gray-50 transition-colors">Cancel</button>
                     <button
-                        disabled={!name.trim()}
+                        disabled={!name.trim() || slots.length === 0 || slots.some(s => s.days.length === 0)}
                         onClick={() => {
                             if (!name.trim()) return;
                             onAdd({
@@ -398,7 +399,7 @@ function AddScheduleModal({ onClose, onAdd }: AddScheduleModalProps) {
                             });
                             onClose();
                         }}
-                        className={`text-xs px-3 py-1.5 rounded bg-[#00695c] text-white font-bold uppercase hover:brightness-110 transition-all ${!name.trim() ? "opacity-50 cursor-not-allowed" : ""}`}
+                        className={`text-xs px-3 py-1.5 rounded bg-[#00695c] text-white font-bold uppercase hover:brightness-110 transition-all ${!name.trim() || slots.length === 0 || slots.some(s => s.days.length === 0) ? "opacity-50 cursor-not-allowed" : ""}`}
                     >
                         Add Schedule
                     </button>

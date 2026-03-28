@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { listDevices, createDevice } from '@/services/device-service'
 import { toJsonSafe } from '@/lib/utils'
+import { validate, createDeviceSchema } from '@/lib/validators'
 
 export async function GET(request: NextRequest) {
 	const { searchParams } = request.nextUrl
@@ -21,7 +22,9 @@ export async function POST(request: NextRequest) {
 	let body: any
 	try { body = await request.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
 	try {
-		const d = await createDevice(body)
+		const v = validate(createDeviceSchema, body)
+		if (!v.success) return NextResponse.json({ error: v.error }, { status: 400 })
+		const d = await createDevice(v.data)
 		return new NextResponse(JSON.stringify(toJsonSafe(d)), { headers: { 'Content-Type': 'application/json' }, status: 201 })
 	} catch (err) {
 		const message = err instanceof Error ? err.message : 'Unknown error'

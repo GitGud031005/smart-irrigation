@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSensorReading, updateSensorReading, deleteSensorReading } from '@/services/sensor-service'
 import { toJsonSafe } from '@/lib/utils'
+import { validate, updateSensorReadingSchema } from '@/lib/validators'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ readingId: string }> }) {
 	const { readingId } = await params
@@ -30,10 +31,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 		return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
 	}
 	try {
+		const v = validate(updateSensorReadingSchema, body)
+		if (!v.success) return NextResponse.json({ error: v.error }, { status: 400 })
 		const reading = await updateSensorReading(readingId, {
-			soilMoisture: body.soilMoisture,
-			temperature: body.temperature,
-			humidity: body.humidity,
+			soilMoisture: v.data.soilMoisture,
+			temperature: v.data.temperature,
+			humidity: v.data.humidity,
 		})
 		return new NextResponse(JSON.stringify(toJsonSafe(reading)), {
 			headers: { 'Content-Type': 'application/json' },

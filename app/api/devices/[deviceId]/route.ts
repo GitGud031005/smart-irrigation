@@ -6,6 +6,7 @@ import { controlPump } from '@/lib/adafruit-io'
 import { verifyToken, COOKIE_NAME } from '@/lib/auth'
 import { getUserById } from '@/services/auth-service'
 import { toJsonSafe } from '@/lib/utils'
+import { validate, updateDeviceSchema } from '@/lib/validators'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ deviceId: string }> }) {
 	const { deviceId } = await params
@@ -82,11 +83,13 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
 	// Normal device update (no pump control)
 	try {
+		const v = validate(updateDeviceSchema, body)
+		if (!v.success) return NextResponse.json({ error: v.error }, { status: 400 })
 		const d = await updateDevice(deviceId, {
-			deviceType: body.deviceType ?? undefined,
-			feedKey: body.feedKey ?? undefined,
-			zoneId: body.zoneId,
-			status: body.status,
+			deviceType: v.data.deviceType ?? undefined,
+			feedKey: v.data.feedKey ?? undefined,
+			zoneId: v.data.zoneId,
+			status: v.data.status,
 		})
 		return new NextResponse(JSON.stringify(toJsonSafe(d)), { headers: { 'Content-Type': 'application/json' } })
 	} catch (err) {

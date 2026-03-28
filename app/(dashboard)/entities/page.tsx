@@ -76,33 +76,42 @@ function getVisiblePages(current: number, total: number): (number | string)[] {
 
 type SettingsModalProps = {
   device: Device;
-  zones: Zone[];
   onClose: () => void;
   onSave: (id: string, data: { deviceType: DeviceType | null; feedKey: string | null; zoneId: string | null; status: DeviceStatus }) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
 };
 
-function SettingsModal({ device, zones, onClose, onSave, onDelete }: SettingsModalProps) {
+function SettingsModal({ device, onClose, onSave, onDelete }: SettingsModalProps) {
   const [form, setForm] = useState({
     deviceType: device.deviceType ?? "" as DeviceType | "",
     feedKey:    device.feedKey ?? "",
-    zoneId:     device.zoneId ?? "",
     status:     device.status,
   });
   const [saving,         setSaving]         = useState(false);
   const [deleting,       setDeleting]       = useState(false);
   const [confirmDelete,  setConfirmDelete]  = useState(false);
+  const [error,          setError]          = useState<string | null>(null);
 
   const handleSave = async () => {
+    if (!form.deviceType) {
+      setError("Device type is required.");
+      return;
+    }
     setSaving(true);
-    await onSave(device.id, {
-      deviceType: form.deviceType || null,
-      feedKey:    form.feedKey    || null,
-      zoneId:     form.zoneId     || null,
-      status:     form.status,
-    });
-    setSaving(false);
-    onClose();
+    setError(null);
+    try {
+      await onSave(device.id, {
+        deviceType: form.deviceType || null,
+        feedKey:    form.feedKey    || null,
+        zoneId:     device.zoneId,
+        status:     form.status,
+      });
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save device');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDelete = async () => {
@@ -132,6 +141,9 @@ function SettingsModal({ device, zones, onClose, onSave, onDelete }: SettingsMod
 
         {/* Body */}
         <div className="p-4 space-y-3">
+          {error && (
+            <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-2 py-1.5">{error}</p>
+          )}
           {/* Read-only ID */}
           <div>
             <label className="block text-[11px] font-bold uppercase text-gray-400 mb-1">Device ID</label>
@@ -161,20 +173,6 @@ function SettingsModal({ device, zones, onClose, onSave, onDelete }: SettingsMod
               placeholder="e.g. username/feed-name"
             />
           </div>
-          {/* zoneId */}
-          <div>
-            <label className="block text-[11px] font-bold uppercase text-gray-400 mb-1">Zone</label>
-            <select
-              className="w-full border border-[#ddd] rounded px-2 py-1.5 text-sm focus:outline-none focus:border-[#00695c]"
-              value={form.zoneId}
-              onChange={(e) => setForm({ ...form, zoneId: e.target.value })}
-            >
-              <option value="">Unassigned</option>
-              {zones.map((zone) => (
-                <option key={zone.id} value={zone.id}>{zone.name}</option>
-              ))}
-            </select>
-          </div>
           {/* status */}
           <div>
             <label className="block text-[11px] font-bold uppercase text-gray-400 mb-1">Status</label>
@@ -187,13 +185,6 @@ function SettingsModal({ device, zones, onClose, onSave, onDelete }: SettingsMod
               <option value="OFFLINE">Offline</option>
               <option value="ERROR">Error</option>
             </select>
-          </div>
-          {/* Read-only lastActiveAt */}
-          <div>
-            <label className="block text-[11px] font-bold uppercase text-gray-400 mb-1">Last Active</label>
-            <p className="text-xs text-gray-500 bg-gray-50 rounded px-2 py-1.5 border border-[#eee]">
-              {formatDate(device.lastActiveAt)}
-            </p>
           </div>
         </div>
 
@@ -236,24 +227,39 @@ function SettingsModal({ device, zones, onClose, onSave, onDelete }: SettingsMod
 
 type AddDeviceModalProps = {
   zones: Zone[];
+  activeZoneId: string | null;
   onClose: () => void;
-  onAdd: (data: { deviceType: DeviceType | null; feedKey: string | null; zoneId: string | null; status: DeviceStatus }) => Promise<void>;
+  onAdd: (data: { deviceType: DeviceType; feedKey: string | null; zoneId: string }) => Promise<void>;
 };
 
-function AddDeviceModal({ zones, onClose, onAdd }: AddDeviceModalProps) {
-  const [form, setForm] = useState({ deviceType: "" as DeviceType | "", feedKey: "", zoneId: "", status: "ACTIVE" as DeviceStatus });
+function AddDeviceModal({ activeZoneId, onClose, onAdd }: AddDeviceModalProps) {
+  const [form, setForm] = useState({ deviceType: "" as DeviceType | "", feedKey: "", zoneId: activeZoneId ?? "" });
   const [saving, setSaving] = useState(false);
+  const [error, setError]   = useState<string | null>(null);
 
   const handleAdd = async () => {
+    if (!form.deviceType) {
+      setError("Device type is required.");
+      return;
+    }
+    if (!form.zoneId) {
+      setError("No active zone selected. Please select a zone tab first.");
+      return;
+    }
     setSaving(true);
-    await onAdd({
-      deviceType: form.deviceType || null,
-      feedKey:    form.feedKey    || null,
-      zoneId:     form.zoneId     || null,
-      status:     form.status,
-    });
-    setSaving(false);
-    onClose();
+    setError(null);
+    try {
+      await onAdd({
+        deviceType: form.deviceType as DeviceType,
+        feedKey:    form.feedKey    || null,
+        zoneId:     form.zoneId,
+      });
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to add device');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -272,6 +278,9 @@ function AddDeviceModal({ zones, onClose, onAdd }: AddDeviceModalProps) {
           </button>
         </div>
         <div className="p-4 space-y-3">
+          {error && (
+            <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-2 py-1.5">{error}</p>
+          )}
           <div>
             <label className="block text-[11px] font-bold uppercase text-gray-400 mb-1">Device Type</label>
             <select
@@ -294,31 +303,6 @@ function AddDeviceModal({ zones, onClose, onAdd }: AddDeviceModalProps) {
               placeholder="e.g. username/feed-name"
             />
           </div>
-          <div>
-            <label className="block text-[11px] font-bold uppercase text-gray-400 mb-1">Zone</label>
-            <select
-              className="w-full border border-[#ddd] rounded px-2 py-1.5 text-sm focus:outline-none focus:border-[#00695c]"
-              value={form.zoneId}
-              onChange={(e) => setForm({ ...form, zoneId: e.target.value })}
-            >
-              <option value="">Unassigned</option>
-              {zones.map((zone) => (
-                <option key={zone.id} value={zone.id}>{zone.name}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-[11px] font-bold uppercase text-gray-400 mb-1">Status</label>
-            <select
-              className="w-full border border-[#ddd] rounded px-2 py-1.5 text-sm focus:outline-none focus:border-[#00695c]"
-              value={form.status}
-              onChange={(e) => setForm({ ...form, status: e.target.value as DeviceStatus })}
-            >
-              <option value="ACTIVE">Active</option>
-              <option value="OFFLINE">Offline</option>
-              <option value="ERROR">Error</option>
-            </select>
-          </div>
         </div>
         <div className="border-t border-[#eee] py-3 px-4 flex justify-end gap-2">
           <button
@@ -329,8 +313,8 @@ function AddDeviceModal({ zones, onClose, onAdd }: AddDeviceModalProps) {
           </button>
           <button
             onClick={handleAdd}
-            disabled={saving}
-            className="text-xs px-3 py-1.5 rounded bg-[#00695c] text-white font-bold uppercase hover:brightness-110 transition-all disabled:opacity-60"
+            disabled={saving || !form.deviceType || !form.zoneId}
+            className={`text-xs px-3 py-1.5 rounded bg-[#00695c] text-white font-bold uppercase hover:brightness-110 transition-all ${saving || !form.deviceType || !form.zoneId ? "opacity-50 cursor-not-allowed" : ""}`}
           >
             {saving ? "Adding…" : "Add Device"}
           </button>
@@ -396,7 +380,7 @@ export default function EntitiesPage() {
     if (activeZone) await loadDevices(activeZone.id);
   };
 
-  const handleAdd = async (data: { deviceType: DeviceType | null; feedKey: string | null; zoneId: string | null; status: DeviceStatus }) => {
+  const handleAdd = async (data: { deviceType: DeviceType; feedKey: string | null; zoneId: string }) => {
     await apiCall("/api/devices", { method: "POST", body: JSON.stringify(data) });
     if (activeZone) await loadDevices(activeZone.id);
   };
@@ -553,7 +537,6 @@ export default function EntitiesPage() {
       {selectedDevice && (
         <SettingsModal
           device={selectedDevice}
-          zones={zones}
           onClose={() => setSelectedDevice(null)}
           onSave={handleSave}
           onDelete={handleDelete}
@@ -564,6 +547,7 @@ export default function EntitiesPage() {
       {showAddModal && (
         <AddDeviceModal
           zones={zones}
+          activeZoneId={activeZone?.id ?? null}
           onClose={() => setShowAddModal(false)}
           onAdd={handleAdd}
         />

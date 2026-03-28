@@ -28,7 +28,7 @@ function getVisiblePages(current: number, total: number): (number | string)[] {
 type SettingsModalProps = {
   profile: Profile;
   onClose: () => void;
-  onSave: (id: string, data: Partial<Profile>) => void;
+  onSave: (id: string, data: Partial<Profile>) => Promise<void>;
   onDelete: (id: string) => void;
 };
 
@@ -39,7 +39,30 @@ function SettingsModal({ profile, onClose, onSave, onDelete }: SettingsModalProp
     maxMoisture: profile.maxMoisture,
     mode:        profile.mode,
   });
+  const [saving,        setSaving]        = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [error,         setError]         = useState<string | null>(null);
+
+  const handleSave = async () => {
+    if (!form.name.trim()) {
+      setError("Name is required.");
+      return;
+    }
+    if (form.minMoisture > form.maxMoisture) {
+      setError("Min Moisture must be less than or equal to Max Moisture.");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      await onSave(profile.id, { name: form.name || undefined, minMoisture: form.minMoisture, maxMoisture: form.maxMoisture, mode: form.mode });
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save profile");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div
@@ -57,6 +80,9 @@ function SettingsModal({ profile, onClose, onSave, onDelete }: SettingsModalProp
           </button>
         </div>
         <div className="p-4 space-y-3">
+          {error && (
+            <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-2 py-1.5">{error}</p>
+          )}
           <div>
             <label className="block text-[11px] font-bold uppercase text-gray-400 mb-1">Profile ID</label>
             <p className="text-xs font-mono text-gray-500 bg-gray-50 rounded px-2 py-1.5 border border-[#eee] break-all">{profile.id}</p>
@@ -120,13 +146,11 @@ function SettingsModal({ profile, onClose, onSave, onDelete }: SettingsModalProp
           <div className="flex gap-2">
             <button onClick={onClose} className="text-xs px-3 py-1.5 rounded border border-[#ddd] text-gray-500 hover:bg-gray-50 transition-colors">Cancel</button>
             <button
-              onClick={() => {
-                onSave(profile.id, { name: form.name || undefined, minMoisture: form.minMoisture, maxMoisture: form.maxMoisture, mode: form.mode });
-                onClose();
-              }}
-              className="text-xs px-3 py-1.5 rounded bg-[#00695c] text-white font-bold uppercase hover:brightness-110 transition-all"
+              onClick={handleSave}
+              disabled={saving}
+              className="text-xs px-3 py-1.5 rounded bg-[#00695c] text-white font-bold uppercase hover:brightness-110 transition-all disabled:opacity-60"
             >
-              Save Changes
+              {saving ? "Saving…" : "Save Changes"}
             </button>
           </div>
         </div>
@@ -139,11 +163,40 @@ function SettingsModal({ profile, onClose, onSave, onDelete }: SettingsModalProp
 
 type AddProfileModalProps = {
   onClose: () => void;
-  onAdd: (data: Omit<Profile, "id">) => void;
+  onAdd: (data: Omit<Profile, "id">) => Promise<void>;
 };
 
 function AddProfileModal({ onClose, onAdd }: AddProfileModalProps) {
-  const [form, setForm] = useState({ name: "", minMoisture: 40, maxMoisture: 80, mode: IrrigationMode.AUTO });
+  const [form, setForm] = useState<{ name: string; minMoisture: number | ""; maxMoisture: number | ""; mode: IrrigationMode | "" }>({
+    name: "", minMoisture: "", maxMoisture: "", mode: "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [error,  setError]  = useState<string | null>(null);
+
+  const handleAdd = async () => {
+    if (!form.name.trim()) {
+      setError("Name is required.");
+      return;
+    }
+    if (form.minMoisture === "" || form.maxMoisture === "" || !form.mode) {
+      setError("Please fill in Min Moisture, Max Moisture, and Mode.");
+      return;
+    }
+    if ((form.minMoisture as number) > (form.maxMoisture as number)) {
+      setError("Min Moisture must be less than or equal to Max Moisture.");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      await onAdd({ name: form.name.trim(), minMoisture: form.minMoisture, maxMoisture: form.maxMoisture, mode: form.mode });
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to add profile");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div
@@ -161,6 +214,9 @@ function AddProfileModal({ onClose, onAdd }: AddProfileModalProps) {
           </button>
         </div>
         <div className="p-4 space-y-3">
+          {error && (
+            <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-2 py-1.5">{error}</p>
+          )}
           <div>
             <label className="block text-[11px] font-bold uppercase text-gray-400 mb-1">Name</label>
             <input
@@ -173,16 +229,17 @@ function AddProfileModal({ onClose, onAdd }: AddProfileModalProps) {
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="block text-[11px] font-bold uppercase text-gray-400 mb-1">Min Moisture (%)</label>
-              <input type="number" className="w-full border border-[#ddd] rounded px-2 py-1.5 text-sm focus:outline-none focus:border-[#00695c]" value={form.minMoisture} onChange={(e) => setForm({ ...form, minMoisture: Number(e.target.value) })} />
+              <input type="number" className="w-full border border-[#ddd] rounded px-2 py-1.5 text-sm focus:outline-none focus:border-[#00695c]" value={form.minMoisture} placeholder="e.g. 30" onChange={(e) => setForm({ ...form, minMoisture: e.target.value === "" ? "" : Number(e.target.value) })} />
             </div>
             <div>
               <label className="block text-[11px] font-bold uppercase text-gray-400 mb-1">Max Moisture (%)</label>
-              <input type="number" className="w-full border border-[#ddd] rounded px-2 py-1.5 text-sm focus:outline-none focus:border-[#00695c]" value={form.maxMoisture} onChange={(e) => setForm({ ...form, maxMoisture: Number(e.target.value) })} />
+              <input type="number" className="w-full border border-[#ddd] rounded px-2 py-1.5 text-sm focus:outline-none focus:border-[#00695c]" value={form.maxMoisture} placeholder="e.g. 70" onChange={(e) => setForm({ ...form, maxMoisture: e.target.value === "" ? "" : Number(e.target.value) })} />
             </div>
           </div>
           <div>
             <label className="block text-[11px] font-bold uppercase text-gray-400 mb-1">Mode</label>
-            <select className="w-full border border-[#ddd] rounded px-2 py-1.5 text-sm focus:outline-none focus:border-[#00695c]" value={form.mode} onChange={(e) => setForm({ ...form, mode: e.target.value as IrrigationMode })}>
+            <select className="w-full border border-[#ddd] rounded px-2 py-1.5 text-sm focus:outline-none focus:border-[#00695c]" value={form.mode} onChange={(e) => setForm({ ...form, mode: e.target.value as IrrigationMode | "" })}>
+              <option value="">— Select mode —</option>
               <option value={IrrigationMode.AUTO}>Auto</option>
               <option value={IrrigationMode.MANUAL}>Manual</option>
               <option value={IrrigationMode.AI}>AI</option>
@@ -192,14 +249,11 @@ function AddProfileModal({ onClose, onAdd }: AddProfileModalProps) {
         <div className="border-t border-[#eee] py-3 px-4 flex justify-end gap-2">
           <button onClick={onClose} className="text-xs px-3 py-1.5 rounded border border-[#ddd] text-gray-500 hover:bg-gray-50 transition-colors">Cancel</button>
           <button
-            onClick={() => {
-              if (!form.name.trim()) return;
-              onAdd({ name: form.name, minMoisture: form.minMoisture, maxMoisture: form.maxMoisture, mode: form.mode });
-              onClose();
-            }}
-            className="text-xs px-3 py-1.5 rounded bg-[#00695c] text-white font-bold uppercase hover:brightness-110 transition-all"
+            onClick={handleAdd}
+            disabled={saving || !form.name.trim() || form.minMoisture === "" || form.maxMoisture === "" || !form.mode}
+            className={`text-xs px-3 py-1.5 rounded bg-[#00695c] text-white font-bold uppercase hover:brightness-110 transition-all ${saving || !form.name.trim() || form.minMoisture === "" || form.maxMoisture === "" || !form.mode ? "opacity-50 cursor-not-allowed" : ""}`}
           >
-            Add Profile
+            {saving ? "Adding…" : "Add Profile"}
           </button>
         </div>
       </div>
@@ -239,10 +293,14 @@ export default function ProfilesPage() {
   const totalPages = Math.max(1, Math.ceil(profiles.length / PAGE_SIZE));
   const pageData   = useMemo(() => profiles.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [profiles, page]);
 
-  const handleSave = (id: string, data: Partial<Profile>) => {
+  const handleSave = async (id: string, data: Partial<Profile>): Promise<void> => {
     setProfiles(prev => prev.map(p => p.id === id ? { ...p, ...data } : p));
-    apiCall(`/api/profiles/${id}`, { method: 'PUT', body: JSON.stringify(data) })
-      .catch(() => { loadProfiles(); });
+    try {
+      await apiCall(`/api/profiles/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+    } catch (err) {
+      loadProfiles();
+      throw err;
+    }
   };
 
   const handleDelete = (id: string) => {
@@ -251,10 +309,9 @@ export default function ProfilesPage() {
       .catch(() => { loadProfiles(); });
   };
 
-  const handleAdd = (data: Omit<Profile, 'id'>) => {
-    apiCall<Profile>('/api/profiles', { method: 'POST', body: JSON.stringify(data) })
-      .then(newProfile => setProfiles(prev => [...prev, newProfile]))
-      .catch(() => {});
+  const handleAdd = async (data: Omit<Profile, 'id'>): Promise<void> => {
+    const newProfile = await apiCall<Profile>('/api/profiles', { method: 'POST', body: JSON.stringify(data) });
+    setProfiles(prev => [...prev, newProfile]);
   };
 
   return (

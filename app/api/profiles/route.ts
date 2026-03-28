@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { listProfiles, createProfile } from '@/services/profile-service'
 import { toJsonSafe } from '@/lib/utils'
 import { verifyToken, COOKIE_NAME } from '@/lib/auth'
+import { validate, createProfileSchema } from '@/lib/validators'
 
 export async function GET(request: NextRequest) {
 	const token = request.cookies.get(COOKIE_NAME)?.value
@@ -26,7 +27,9 @@ export async function POST(request: NextRequest) {
 	try {
 		// eslint-disable-next-line @typescript-eslint/no-unused-vars
 		const { userId: _ignored, ...rest } = body
-		const profile = await createProfile({ ...rest, userId: payload.userId })
+		const v = validate(createProfileSchema, rest)
+		if (!v.success) return NextResponse.json({ error: v.error }, { status: 400 })
+		const profile = await createProfile({ ...v.data, name: v.data.name ?? undefined, userId: payload.userId })
 		return new NextResponse(JSON.stringify(toJsonSafe(profile)), { headers: { 'Content-Type': 'application/json' }, status: 201 })
 	} catch (err) {
 		const message = err instanceof Error ? err.message : 'Unknown error'

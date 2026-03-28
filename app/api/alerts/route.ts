@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { listAlerts, createAlert } from '@/services/alert-service'
 import { toJsonSafe } from '@/lib/utils'
 import type { AlertSeverity, AlertType, AlertActor } from '@/models/alert'
+import { validate, createAlertSchema } from '@/lib/validators'
 
 export async function GET(request: NextRequest) {
 	const { searchParams } = request.nextUrl
@@ -26,8 +27,10 @@ export async function POST(request: NextRequest) {
 	if (!body.type)  return NextResponse.json({ error: 'type is required' }, { status: 400 })
 	if (!body.actor) return NextResponse.json({ error: 'actor is required' }, { status: 400 })
 	if (!body.message) return NextResponse.json({ error: 'message is required' }, { status: 400 })
+	const v = validate(createAlertSchema, body)
+	if (!v.success) return NextResponse.json({ error: v.error }, { status: 400 })
 	try {
-		const a = await createAlert(body)
+		const a = await createAlert({ ...v.data, zoneId: v.data.zoneId ?? undefined })
 		return new NextResponse(JSON.stringify(toJsonSafe(a)), { headers: { 'Content-Type': 'application/json' }, status: 201 })
 	} catch (err) {
 		const message = err instanceof Error ? err.message : 'Unknown error'

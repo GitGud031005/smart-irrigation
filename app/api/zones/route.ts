@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { listZones, createZone } from '@/services/zone-service'
 import { toJsonSafe } from '@/lib/utils'
 import { verifyToken, COOKIE_NAME } from '@/lib/auth'
+import { validate, createZoneSchema } from '@/lib/validators'
 
 export async function GET(request: NextRequest) {
 	const token = request.cookies.get(COOKIE_NAME)?.value
@@ -28,11 +29,11 @@ export async function POST(request: NextRequest) {
 		return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
 	}
 	try {
-    // Strip userId from body — always use the authenticated user's id
-    // This protects if someone outside your app makes requests to your API.
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { userId: _ignored, ...rest } = body;
-    const zone = await createZone({ ...rest, userId: payload.userId });
+    const v = validate(createZoneSchema, rest)
+    if (!v.success) return NextResponse.json({ error: v.error }, { status: 400 })
+    const zone = await createZone({ ...v.data, profileId: v.data.profileId ?? undefined, scheduleId: v.data.scheduleId ?? undefined, userId: payload.userId });
     return new NextResponse(JSON.stringify(toJsonSafe(zone)), {
       headers: { "Content-Type": "application/json" },
       status: 201,

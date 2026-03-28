@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getProfile, updateProfile, deleteProfile } from '@/services/profile-service'
 import { toJsonSafe } from '@/lib/utils'
 import { verifyToken, COOKIE_NAME } from '@/lib/auth'
+import { validate, updateProfileSchema } from '@/lib/validators'
 
 async function authorizeProfile(request: NextRequest, profileId: string) {
 	const token = request.cookies.get(COOKIE_NAME)?.value
@@ -36,7 +37,14 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 	try {
 		// eslint-disable-next-line @typescript-eslint/no-unused-vars
 		const { userId: _ignored, ...rest } = body
-		const p = await updateProfile(profileId, rest)
+		const v = validate(updateProfileSchema, rest)
+		if (!v.success) return NextResponse.json({ error: v.error }, { status: 400 })
+		const p = await updateProfile(profileId, {
+			name: v.data.name ?? undefined,
+			minMoisture: v.data.minMoisture,
+			maxMoisture: v.data.maxMoisture,
+			mode: v.data.mode,
+		})
 		return new NextResponse(JSON.stringify(toJsonSafe(p)), { headers: { 'Content-Type': 'application/json' } })
 	} catch (err) {
 		const message = err instanceof Error ? err.message : 'Unknown error'

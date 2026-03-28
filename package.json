@@ -11,19 +11,20 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "chart.js": "^4.5.1",
-    "lucide-react": "^0.577.0",
     "@prisma/adapter-pg": "^7.5.0",
     "@prisma/client": "^7.5.0",
     "bcrypt": "^6.0.0",
+    "chart.js": "^4.5.1",
     "dotenv": "^17.3.1",
     "jose": "^6.2.1",
+    "lucide-react": "^0.577.0",
     "mqtt": "^5.15.0",
     "next": "16.1.7",
     "pg": "^8.20.0",
     "react": "19.2.3",
     "react-chartjs-2": "^5.3.1",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

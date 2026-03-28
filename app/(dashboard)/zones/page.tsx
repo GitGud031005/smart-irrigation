@@ -221,6 +221,7 @@ function AddZoneModal({ profiles, schedules, onClose, onAdd }: AddZoneModalProps
             Cancel
           </button>
           <button
+            disabled={!form.name.trim()}
             onClick={() => {
               if (!form.name.trim()) return;
               onAdd({
@@ -231,7 +232,7 @@ function AddZoneModal({ profiles, schedules, onClose, onAdd }: AddZoneModalProps
               });
               onClose();
             }}
-            className="text-xs px-3 py-1.5 rounded bg-[#00695c] text-white font-bold uppercase hover:brightness-110 transition-all"
+            className={`text-xs px-3 py-1.5 rounded bg-[#00695c] text-white font-bold uppercase hover:brightness-110 transition-all ${!form.name.trim() ? "opacity-50 cursor-not-allowed" : ""}`}
           >
             Add Zone
           </button>
