@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Thermometer, Droplets, Sprout, Power } from "lucide-react";
 import { apiCall } from "@/lib/api";
 import { useZones } from "@/hooks/use-zones";
+import { useSSE } from "@/hooks/use-sse";
 import type { IrrigationProfile } from "@/models/irrigation-profile";
 import {
   Chart as ChartJS,
@@ -126,37 +127,38 @@ export default function DashboardPage() {
       .catch(() => setHistoryReadings([]));
   }, [currentZoneId, timeFilter]);
 
-  // Subscribe to live MQTT sensor stream via SSE (reconnect when zone changes)
-  useEffect(() => {
-    if (!currentZoneId) return;
-    setSensorStatuses({ temperature: null, humidity: null, soilMoisture: null });
-    const source = new EventSource(`/api/sensor-readings/stream?zoneId=${encodeURIComponent(currentZoneId)}`);
-    source.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data as string);
-        if (data.type === "status") {
-          setSensorStatuses({
-            temperature: data.temperature ?? null,
-            humidity: data.humidity ?? null,
-            soilMoisture: data.soilMoisture ?? null,
-          });
-        } else if (data.type === "reading") {
-          setLiveData({
-            temperature: data.temperature ?? null,
-            humidity: data.humidity ?? null,
-            soilMoisture: data.soilMoisture ?? null,
-            zoneId: currentZoneId,
-          });
-          if (data.soilMoisture != null) updateSoilMoisture(currentZoneId, data.soilMoisture);
-        }
-      } catch {
-        // ignore malformed frames
+  // SSE: auto-reconnecting stream (survives Vercel serverless 60-s timeout)
+  const sseUrl = currentZoneId
+    ? `/api/sensor-readings/stream?zoneId=${encodeURIComponent(currentZoneId)}`
+    : null;
+
+  useSSE(sseUrl, (event) => {
+    try {
+      const data = JSON.parse(event.data as string);
+      if (data.type === "status") {
+        setSensorStatuses({
+          temperature: data.temperature ?? null,
+          humidity: data.humidity ?? null,
+          soilMoisture: data.soilMoisture ?? null,
+        });
+      } else if (data.type === "reading") {
+        setLiveData({
+          temperature: data.temperature ?? null,
+          humidity: data.humidity ?? null,
+          soilMoisture: data.soilMoisture ?? null,
+          zoneId: currentZoneId!,
+        });
+        if (data.soilMoisture != null) updateSoilMoisture(currentZoneId!, data.soilMoisture);
       }
-    };
-    return () => {
-      source.close();
-    };
-  }, [currentZoneId, updateSoilMoisture]);
+    } catch {
+      // ignore malformed frames
+    }
+  });
+
+  // Reset sensor statuses whenever the selected zone changes
+  useEffect(() => {
+    setSensorStatuses({ temperature: null, humidity: null, soilMoisture: null });
+  }, [currentZoneId]);
 
   // Pump handlers
   const togglePump = async () => {

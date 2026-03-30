@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { ChevronLeft, ChevronRight, Thermometer, Droplets, Sprout, RefreshCw, Wifi } from "lucide-react";
 import { apiCall } from "@/lib/api";
 import { useZones } from "@/hooks/use-zones";
+import { useSSE } from "@/hooks/use-sse";
 import type { IrrigationProfile } from "@/models/irrigation-profile";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -70,7 +71,6 @@ export default function DataLogsPage() {
     const [logs, setLogs] = useState<SensorLog[]>([]);
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
-    const [liveConnected, setLiveConnected] = useState<boolean>(false);
     const [profiles, setProfiles] = useState<IrrigationProfile[]>([]);
 
     useEffect(() => {
@@ -115,39 +115,29 @@ export default function DataLogsPage() {
         return () => { cancelled = true; };
     }, [activeZoneId]);
 
-    // Subscribe to live readings via SSE → MQTT (reconnect when zone changes)
-    useEffect(() => {
-        if (!activeZoneId) return;
-        const source = new EventSource(`/api/sensor-readings/stream?zoneId=${encodeURIComponent(activeZoneId)}`);
+    // SSE: auto-reconnecting stream (survives Vercel serverless 60-s timeout)
+    const sseUrl = activeZoneId
+        ? `/api/sensor-readings/stream?zoneId=${encodeURIComponent(activeZoneId)}`
+        : null;
 
-        source.onopen = () => setLiveConnected(true);
-
-        source.onmessage = (event) => {
-            try {
-                const raw = JSON.parse(event.data) as {
-                    soilMoisture: number; temperature: number; humidity: number; recordedAt: string;
-                };
-                const entry: SensorLog = {
-                    id: `live-${raw.recordedAt}`,
-                    recordedAt: raw.recordedAt,
-                    temperature: raw.temperature,
-                    humidity: raw.humidity,
-                    soilMoisture: raw.soilMoisture,
-                };
-                // Prepend to list (newest first, matches DESC DB order)
-                setLogs((prev) => [entry, ...prev]);
-            } catch {
-                // ignore malformed SSE frames
-            }
-        };
-
-        source.onerror = () => setLiveConnected(false);
-
-        return () => {
-            source.close();
-            setLiveConnected(false);
-        };
-    }, [activeZoneId]);
+    const { connected: liveConnected } = useSSE(sseUrl, (event) => {
+        try {
+            const raw = JSON.parse(event.data) as {
+                soilMoisture: number; temperature: number; humidity: number; recordedAt: string;
+            };
+            const entry: SensorLog = {
+                id: `live-${raw.recordedAt}`,
+                recordedAt: raw.recordedAt,
+                temperature: raw.temperature,
+                humidity: raw.humidity,
+                soilMoisture: raw.soilMoisture,
+            };
+            // Prepend to list (newest first, matches DESC DB order)
+            setLogs((prev) => [entry, ...prev]);
+        } catch {
+            // ignore malformed SSE frames
+        }
+    });
 
     const totalPages = Math.max(1, Math.ceil(logs.length / PAGE_SIZE));
     const pageData = useMemo(
