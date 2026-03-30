@@ -37,10 +37,12 @@ export function useSSE(
 
     function connect() {
       if (!alive) return;
+      console.log(`[SSE] Connecting to ${effectUrl}`);
       source = new EventSource(effectUrl);
 
       source.onopen = () => {
         if (!alive) { source?.close(); return; }
+        console.log(`[SSE] Connected to ${effectUrl}`);
         setConnected(true);
         delay = INITIAL_DELAY_MS; // reset backoff on successful open
       };
@@ -51,6 +53,7 @@ export function useSSE(
 
       source.onerror = () => {
         if (!alive) return;
+        console.warn(`[SSE] Connection lost for ${effectUrl}. Reconnecting in ${delay}ms…`);
         setConnected(false);
         source?.close();
         source = null;
@@ -65,6 +68,7 @@ export function useSSE(
     connect();
 
     return () => {
+      console.log(`[SSE] Tearing down connection to ${effectUrl}`);
       alive = false;
       if (timer) clearTimeout(timer);
       source?.close();
