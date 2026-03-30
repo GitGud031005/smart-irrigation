@@ -135,13 +135,16 @@ export default function DashboardPage() {
   useSSE(sseUrl, (event) => {
     try {
       const data = JSON.parse(event.data as string);
+      console.log("[SSE] message received:", data);
       if (data.type === "status") {
+        console.log("[SSE] device statuses update:", data);
         setSensorStatuses({
           temperature: data.temperature ?? null,
           humidity: data.humidity ?? null,
           soilMoisture: data.soilMoisture ?? null,
         });
       } else if (data.type === "reading") {
+        console.log("[SSE] sensor reading:", data);
         setLiveData({
           temperature: data.temperature ?? null,
           humidity: data.humidity ?? null,
@@ -149,9 +152,11 @@ export default function DashboardPage() {
           zoneId: currentZoneId!,
         });
         if (data.soilMoisture != null) updateSoilMoisture(currentZoneId!, data.soilMoisture);
+      } else {
+        console.warn("[SSE] unknown message type:", data);
       }
-    } catch {
-      // ignore malformed frames
+    } catch (e) {
+      console.error("[SSE] failed to parse message:", event.data, e);
     }
   });
 

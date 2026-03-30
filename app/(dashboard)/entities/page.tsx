@@ -327,7 +327,7 @@ function AddDeviceModal({ activeZoneId, onClose, onAdd }: AddDeviceModalProps) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function EntitiesPage() {
-  const { zones } = useZones();
+  const { zones, zonesLoading } = useZones();
   const [activeZoneIdx,  setActiveZoneIdx]  = useState(0);
   const [devices,        setDevices]        = useState<Device[]>([]);
   const [loading,        setLoading]        = useState(true);
@@ -406,7 +406,7 @@ export default function EntitiesPage() {
       <div className="shrink-0 flex overflow-x-auto border-b border-[#e0e0e0] scrollbar-zone">
         {zones.length === 0 ? (
           <div className="flex-1 py-2.5 text-[12px] text-gray-300 text-center">
-            {loading ? 'Loading zones…' : 'No zones found'}
+          {zonesLoading ? 'Loading zones…' : 'No zones found'}
           </div>
         ) : (
           zones.map((zone, idx) => (
