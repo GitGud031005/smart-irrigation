@@ -15,6 +15,12 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Allow IoT gateway requests authenticated by API key
+  const gatewayKey = process.env.GATEWAY_API_KEY;
+  if (gatewayKey && request.headers.get("X-API-Key") === gatewayKey) {
+    return NextResponse.next();
+  }
+
   const token = request.cookies.get(COOKIE_NAME)?.value;
   const session = token ? await verifyToken(token) : null;
 
