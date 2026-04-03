@@ -4,6 +4,7 @@ import { getSchedule, updateSchedule, deleteSchedule } from '@/services/schedule
 import { toJsonSafe } from '@/lib/utils'
 import { verifyToken, COOKIE_NAME } from '@/lib/auth'
 import { validate, updateScheduleSchema } from '@/lib/validators'
+import { verifyApiKey } from '@/lib/api-key'
 
 async function authorizeSchedule(request: NextRequest, scheduleId: string) {
 	const token = request.cookies.get(COOKIE_NAME)?.value
@@ -18,6 +19,13 @@ async function authorizeSchedule(request: NextRequest, scheduleId: string) {
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ scheduleId: string }> }) {
 	const { scheduleId } = await params
+	// Allow gateway (API key) or logged-in user (cookie JWT)
+	const apiKey = verifyApiKey(request)
+	if (apiKey.ok) {
+		const schedule = await getSchedule(scheduleId)
+		if (!schedule) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+		return new NextResponse(JSON.stringify(toJsonSafe(schedule)), { headers: { 'Content-Type': 'application/json' } })
+	}
 	const auth = await authorizeSchedule(request, scheduleId)
 	if ('error' in auth) return auth.error
 	try {
