@@ -15,7 +15,6 @@ type DeviceType =
   | "DHT20_TEMPERATURE_SENSOR"
   | "DHT20_HUMIDITY_SENSOR"
   | "RELAY_MODULE"
-  | "LCD_16X2_DISPLAY"
   | "ESP32";
 
 type Device = {
@@ -42,7 +41,6 @@ const DEVICE_TYPE_OPTIONS: { value: DeviceType; label: string }[] = [
   { value: "DHT20_TEMPERATURE_SENSOR", label: "DHT20 Temperature Sensor" },
   { value: "DHT20_HUMIDITY_SENSOR",   label: "DHT20 Humidity Sensor" },
   { value: "RELAY_MODULE",            label: "Relay Module" },
-  { value: "LCD_16X2_DISPLAY",        label: "LCD 16x2 Display" },
   { value: "ESP32",                   label: "ESP32" },
 ];
 
@@ -51,7 +49,6 @@ const DEVICE_TYPE_LABEL: Record<DeviceType, string> = {
   DHT20_TEMPERATURE_SENSOR: "DHT20 Temperature Sensor",
   DHT20_HUMIDITY_SENSOR:   "DHT20 Humidity Sensor",
   RELAY_MODULE:            "Relay Module",
-  LCD_16X2_DISPLAY:        "LCD 16x2 Display",
   ESP32:                   "ESP32",
 };
 
