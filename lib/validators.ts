@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 // ── Enums ──────────────────────────────────────────────────────
 const IrrigationMode = z.enum(['AUTO', 'MANUAL', 'AI'])
-const DeviceType = z.enum(['SOIL_MOISTURE_SENSOR', 'DHT20_TEMPERATURE_SENSOR', 'DHT20_HUMIDITY_SENSOR', 'RELAY_MODULE', 'LCD_16X2_DISPLAY', 'ESP32'])
+const DeviceType = z.enum(['SOIL_MOISTURE_SENSOR', 'DHT20_TEMPERATURE_SENSOR', 'DHT20_HUMIDITY_SENSOR', 'RELAY_MODULE', 'ESP32'])
 const DeviceStatus = z.enum(['ACTIVE', 'OFFLINE', 'ERROR'])
 const AlertSeverity = z.enum(['INFO', 'WARNING', 'CRITICAL'])
 const AlertType = z.enum(['DEVICE_STATUS', 'PLANT_STATUS', 'IRRIGATION_EVENT'])
