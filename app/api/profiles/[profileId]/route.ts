@@ -4,6 +4,7 @@ import { getProfile, updateProfile, deleteProfile } from '@/services/profile-ser
 import { toJsonSafe } from '@/lib/utils'
 import { verifyToken, COOKIE_NAME } from '@/lib/auth'
 import { validate, updateProfileSchema } from '@/lib/validators'
+import { verifyApiKey } from '@/lib/api-key'
 
 async function authorizeProfile(request: NextRequest, profileId: string) {
 	const token = request.cookies.get(COOKIE_NAME)?.value
@@ -18,6 +19,13 @@ async function authorizeProfile(request: NextRequest, profileId: string) {
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ profileId: string }> }) {
 	const { profileId } = await params
+	// Allow gateway (API key) or logged-in user (cookie JWT)
+	const apiKey = verifyApiKey(request)
+	if (apiKey.ok) {
+		const profile = await getProfile(profileId)
+		if (!profile) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+		return new NextResponse(JSON.stringify(toJsonSafe(profile)), { headers: { 'Content-Type': 'application/json' } })
+	}
 	const auth = await authorizeProfile(request, profileId)
 	if ('error' in auth) return auth.error
 	try {

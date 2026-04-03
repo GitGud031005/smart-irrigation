@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { queryIrrigationEvents, createIrrigationEvent } from '@/services/irrigation-service'
 import { toJsonSafe } from '@/lib/utils'
 import { validate, createIrrigationEventSchema } from '@/lib/validators'
+import { verifyApiKey } from '@/lib/api-key'
 
 export async function GET(request: NextRequest) {
 	const { searchParams } = request.nextUrl
@@ -20,6 +21,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+	const auth = verifyApiKey(request)
+	if (!auth.ok) return auth.error
 	let body: any
 	try { body = await request.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
 	try {

@@ -3,9 +3,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getZone, updateZone, deleteZone } from '@/services/zone-service'
 import { toJsonSafe } from '@/lib/utils'
 import { validate, updateZoneSchema } from '@/lib/validators'
+import { verifyApiKey } from '@/lib/api-key'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ zoneId: string }> }) {
 	const { zoneId } = await params
+	const auth = verifyApiKey(request)
+	if (!auth.ok) return auth.error
 	try {
 		const zone = await getZone(zoneId)
 		if (!zone) return NextResponse.json({ error: 'Not found' }, { status: 404 })
