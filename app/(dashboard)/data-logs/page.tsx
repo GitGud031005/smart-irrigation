@@ -123,8 +123,11 @@ export default function DataLogsPage() {
     const { connected: liveConnected } = useSSE(sseUrl, (event) => {
         try {
             const raw = JSON.parse(event.data) as {
+                type?: string;
                 soilMoisture: number; temperature: number; humidity: number; recordedAt: string;
             };
+            // Only process actual sensor readings — ignore "status" frames
+            if (raw.type !== "reading") return;
             const entry: SensorLog = {
                 id: `live-${raw.recordedAt}`,
                 recordedAt: raw.recordedAt,
