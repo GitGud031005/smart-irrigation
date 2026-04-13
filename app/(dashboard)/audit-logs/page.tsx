@@ -3,10 +3,11 @@
 // Filter bar: type, severity, actor, keyword search
 // Log table: timestamp, severity badge, type, zone name, message, actor
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { Search } from "lucide-react";
+import { Search, Wifi } from "lucide-react";
 import type { AlertSeverity, AlertType, AlertActor } from "@/models/alert";
 import { apiCall } from "@/lib/api";
 import { useZones } from "@/hooks/use-zones";
+import { useSSE } from "@/hooks/use-sse";
 
 interface AlertRow {
   id: string;
@@ -67,6 +68,42 @@ export default function AuditLogsPage() {
   const [loading, setLoading]   = useState(true);
   const [page, setPage]         = useState(1);
 
+  // Live SSE — subscribes to the audit-log Adafruit feed
+  const { connected: liveConnected } = useSSE("/api/alerts/stream", (event) => {
+    try {
+      const raw = JSON.parse(event.data) as {
+        type: string;
+        id: string;
+        createdAt: string;
+        message: string;
+        severity: AlertSeverity;
+        alertType: AlertType;
+        actor: AlertActor;
+        zoneId: string | null;
+      };
+      if (raw.type !== "audit") return;
+      const newRow: AlertRow = {
+        id:        raw.id,
+        createdAt: raw.createdAt,
+        message:   raw.message,
+        severity:  raw.severity,
+        type:      raw.alertType,
+        actor:     raw.actor,
+        zoneId:    raw.zoneId ?? undefined,
+      };
+      // Prepend — newest first, matching DB DESC order
+      setAlerts((prev) => [newRow, ...prev]);
+    } catch {
+      // ignore malformed frames
+    }
+  });
+
+  // Re-apply filters whenever base alert list changes
+  useEffect(() => {
+    applyFilters();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [alerts]);
+
   // filter state
   const [filterType,     setFilterType]     = useState<string>("");
   const [filterSeverity, setFilterSeverity] = useState<string>("");
@@ -108,9 +145,15 @@ export default function AuditLogsPage() {
   return (
     <div className="h-full flex flex-col text-[#333] font-sans">
       {/* Page Title */}
-      <div className="mb-4 shrink-0">
-        <h2 className="text-xl font-medium text-slate-800">Audit Logs</h2>
-        <p className="text-xs text-gray-400 mt-0.5">System alerts and events with severity, type, and actor information</p>
+      <div className="mb-4 shrink-0 flex items-end justify-between">
+        <div>
+          <h2 className="text-xl font-medium text-slate-800">Audit Logs</h2>
+          <p className="text-xs text-gray-400 mt-0.5">System alerts and events with severity, type, and actor information</p>
+        </div>
+        <span className={`flex items-center gap-1 text-[11px] font-medium ${liveConnected ? "text-emerald-600" : "text-gray-400"}`}>
+          <Wifi className="w-3.5 h-3.5" />
+          {liveConnected ? "Live" : "Connecting..."}
+        </span>
       </div>
 
       {/* Filters Bar */}

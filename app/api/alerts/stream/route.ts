@@ -1,0 +1,135 @@
+// GET /api/alerts/stream — SSE endpoint for live audit-log events.
+// Subscribes to the user's `audit-log` Adafruit IO MQTT feed server-side.
+// Each message published by the gateway is:
+//   1. Persisted as an Alert row in the DB.
+//   2. Streamed to the browser as an SSE event so the audit-logs page
+//      can display it without a page refresh.
+//
+// Expected MQTT payload (JSON string):
+//   { "message": "...", "severity": "INFO"|"WARNING"|"CRITICAL",
+//     "type": "DEVICE_STATUS"|"PLANT_STATUS"|"IRRIGATION_EVENT",
+//     "actor": "USER"|"SYSTEM"|"AI", "zoneId": "<optional uuid>" }
+// Plain-text payloads are also accepted and stored as INFO/DEVICE_STATUS/SYSTEM.
+
+import { NextRequest } from "next/server";
+import { subscribeToFeed, unsubscribeFromFeed } from "@/lib/mqtt";
+import { verifyToken, COOKIE_NAME } from "@/lib/auth";
+import { getUserById } from "@/services/auth-service";
+import { createAlert } from "@/services/alert-service";
+import type { AlertSeverity, AlertType, AlertActor } from "@/models/alert";
+
+export const dynamic = "force-dynamic";
+
+/** The Adafruit IO feed key that the IoT gateway publishes audit events to. */
+const AUDIT_FEED_KEY = "audit-log";
+
+const VALID_SEVERITIES = new Set<string>(["INFO", "WARNING", "CRITICAL"]);
+const VALID_TYPES      = new Set<string>(["DEVICE_STATUS", "PLANT_STATUS", "IRRIGATION_EVENT"]);
+const VALID_ACTORS     = new Set<string>(["USER", "SYSTEM", "AI"]);
+
+function parseMqttPayload(raw: string): {
+  message: string;
+  severity: AlertSeverity;
+  type: AlertType;
+  actor: AlertActor;
+  zoneId?: string;
+} {
+  try {
+    const obj = JSON.parse(raw);
+    return {
+      message:  typeof obj.message  === "string" ? obj.message  : raw,
+      severity: VALID_SEVERITIES.has(obj.severity) ? (obj.severity as AlertSeverity) : "INFO",
+      type:     VALID_TYPES.has(obj.type)           ? (obj.type     as AlertType)     : "DEVICE_STATUS",
+      actor:    VALID_ACTORS.has(obj.actor)          ? (obj.actor    as AlertActor)    : "SYSTEM",
+      zoneId:   typeof obj.zoneId === "string"       ? obj.zoneId                     : undefined,
+    };
+  } catch {
+    // Plain-text payload — treat as an informational system message
+    return { message: raw, severity: "INFO", type: "DEVICE_STATUS", actor: "SYSTEM" };
+  }
+}
+
+export async function GET(request: NextRequest) {
+  // Auth
+  const token = request.cookies.get(COOKIE_NAME)?.value;
+  if (!token) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+  const payload = await verifyToken(token);
+  if (!payload) {
+    return new Response(JSON.stringify({ error: "Invalid token" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+  const dbUser = await getUserById(payload.userId);
+  if (!dbUser?.adafruitUsername || !dbUser?.adafruitKey) {
+    return new Response(
+      JSON.stringify({ error: "Adafruit IO credentials not configured" }),
+      { status: 422, headers: { "Content-Type": "application/json" } }
+    );
+  }
+  const credentials = { username: dbUser.adafruitUsername, key: dbUser.adafruitKey };
+
+  const encoder = new TextEncoder();
+  let cleanup: (() => void) | null = null;
+
+  const stream = new ReadableStream({
+    start(controller) {
+      const emit = (data: object) => {
+        try {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+        } catch {
+          // Client disconnected
+        }
+      };
+
+      const handler = async (_feedKey: string, raw: string) => {
+        const parsed = parseMqttPayload(raw);
+
+        // Persist to DB
+        let saved: { id: string; createdAt: Date };
+        try {
+          saved = await createAlert(parsed);
+        } catch {
+          // DB write failed — still emit to UI so nothing is lost visually
+          saved = { id: `live-${Date.now()}`, createdAt: new Date() };
+        }
+
+        emit({
+          type: "audit",
+          id:        saved.id,
+          createdAt: saved.createdAt instanceof Date
+            ? saved.createdAt.toISOString()
+            : String(saved.createdAt),
+          message:   parsed.message,
+          severity:  parsed.severity,
+          alertType: parsed.type,
+          actor:     parsed.actor,
+          zoneId:    parsed.zoneId ?? null,
+        });
+      };
+
+      subscribeToFeed(credentials, AUDIT_FEED_KEY, handler);
+
+      // Send an initial heartbeat so the client knows the connection is live
+      emit({ type: "connected" });
+
+      cleanup = () => unsubscribeFromFeed(credentials, AUDIT_FEED_KEY, handler);
+    },
+    cancel() {
+      cleanup?.();
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type":  "text/event-stream",
+      "Cache-Control": "no-cache, no-transform",
+      Connection:      "keep-alive",
+    },
+  });
+}
