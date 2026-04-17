@@ -23,7 +23,7 @@ function getVisiblePages(current: number, total: number): (number | string)[] {
 function generateTimeOptions(): string[] {
     const opts: string[] = [];
     for (let h = 0; h < 24; h++) {
-        for (const m of [0, 15, 30, 45]) {
+        for (let m = 0; m < 60; m += 5) {
             opts.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
         }
     }
