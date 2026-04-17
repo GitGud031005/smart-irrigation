@@ -98,7 +98,11 @@ export async function syncZoneSensorReadings(
   const lastStored = await getLatestSensorReading(zoneId).then(
     (r) => (r?.recordedAt ? new Date(r.recordedAt) : null),
   );
-  const params = lastStored ? { start_time: lastStored.toISOString() } : undefined;
+  // Always cap at 100 data points per feed to avoid fetching the entire feed history
+  // on the first sync (which would cause a timeout or rate-limit on Adafruit IO).
+  const params = lastStored
+    ? { start_time: lastStored.toISOString(), limit: 100 }
+    : { limit: 100 };
 
   const [soilData, tempData, humData] = await Promise.all([
     getFeedData(soilDevice.feedKey, credentials, params),
