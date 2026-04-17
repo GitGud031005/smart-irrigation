@@ -41,36 +41,34 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ synced: 0, message: "No users with Adafruit credentials." });
   }
 
-  // Sync all zones for all users concurrently; never let one failure abort the rest
-  const results = await Promise.allSettled(
-    users.flatMap((user) =>
-      user.zones.map((zone) =>
-        syncZoneSensorReadings(zone.id, {
-          username: user.adafruitUsername,
-          key: user.adafruitKey,
-        }),
-      ),
-    ),
-  );
-
+  // Sync zones sequentially per user to stay within Adafruit IO rate limits
+  // (concurrent requests from the same key can get throttled / connection-refused).
   let totalInserted = 0;
   const errors: string[] = [];
+  let synced = 0;
 
-  for (const result of results) {
-    if (result.status === "fulfilled") {
-      totalInserted += result.value.inserted;
-      if (result.value.skipped) {
-        console.warn(`[SyncCron] zone ${result.value.zoneId} skipped: ${result.value.skipped}`);
+  for (const user of users) {
+    for (const zone of user.zones) {
+      synced++;
+      try {
+        const result = await syncZoneSensorReadings(zone.id, {
+          username: user.adafruitUsername,
+          key: user.adafruitKey,
+        });
+        totalInserted += result.inserted;
+        if (result.skipped) {
+          console.warn(`[SyncCron] zone ${result.zoneId} skipped: ${result.skipped}`);
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error("[SyncCron] zone sync failed:", msg);
+        errors.push(`zone ${zone.id}: ${msg}`);
       }
-    } else {
-      const msg = result.reason instanceof Error ? result.reason.message : String(result.reason);
-      console.error("[SyncCron] zone sync failed:", msg);
-      errors.push(msg);
     }
   }
 
   return NextResponse.json({
-    synced:   results.length,
+    synced,
     inserted: totalInserted,
     errors:   errors.length > 0 ? errors : undefined,
   });
