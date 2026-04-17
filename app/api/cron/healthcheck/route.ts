@@ -39,18 +39,37 @@ function deviceLabel(deviceType: DeviceType | null, id: string): string {
 /** Publish a JSON payload to the audit-log feed using the system Adafruit credentials. */
 async function publishAuditToMqtt(payload: object): Promise<void> {
   const username = process.env.ADAFRUIT_IO_USERNAME;
-  const key      = process.env.ADAFRUIT_IO_KEY;
-  if (!username || !key) return; // credentials not configured — skip publish silently
+  const key = process.env.ADAFRUIT_IO_KEY;
+  if (!username || !key) return;
 
   const credentials = { username, key };
-  const mqttClient  = connectMqtt(credentials);
-  const topic       = `${username}/feeds/${AUDIT_FEED_KEY}`;
-  const message     = JSON.stringify(payload);
+  const mqttClient = connectMqtt(credentials);
+  const topic = `${username}/feeds/${AUDIT_FEED_KEY}`;
+  const message = JSON.stringify(payload);
 
   await new Promise<void>((resolve) => {
-    mqttClient.publish(topic, message, (err?: Error | null) => {
-      if (err) console.error("[Reaper] MQTT publish failed:", err.message);
-      resolve(); // resolve regardless so cron always finishes cleanly
+    // Timeout 3 giây phòng hờ MQTT không thể kết nối (bị chặn port)
+    const fallbackTimeout = setTimeout(() => {
+      mqttClient.end(); // Bắt buộc đóng socket
+      console.error("[Reaper] MQTT Timeout");
+      resolve();
+    }, 3000);
+
+    mqttClient.on("connect", () => {
+      mqttClient.publish(topic, message, (err?: Error | null) => {
+        clearTimeout(fallbackTimeout);
+        if (err) console.error("[Reaper] MQTT publish failed:", err.message);
+
+        mqttClient.end(); // DỌN DẸP CHIẾN TRƯỜNG: Đóng socket ngay lập tức
+        resolve();
+      });
+    });
+
+    mqttClient.on("error", (err) => {
+      clearTimeout(fallbackTimeout);
+      console.error("[Reaper] MQTT Error:", err);
+      mqttClient.end();
+      resolve();
     });
   });
 }
