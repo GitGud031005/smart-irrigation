@@ -212,7 +212,15 @@ export async function POST(request: NextRequest) {
 
   const { amount_pct, scheduled_at_abs } = aiResult;
 
-  if (typeof amount_pct !== "number" || !scheduled_at_abs) {
+  // AI service may return null scheduled_at_abs when no irrigation is needed
+  // or when it cannot produce a recommendation. In that case skip irrigation
+  // this cycle and tell the gateway to try again in 1 hour.
+  if (!scheduled_at_abs) {
+    const nextHour = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    return NextResponse.json({ scheduled_at: nextHour, duration_seconds: 0 });
+  }
+
+  if (typeof amount_pct !== "number") {
     return NextResponse.json({ error: "Unexpected AI service response shape" }, { status: 502 });
   }
 
