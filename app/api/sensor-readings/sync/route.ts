@@ -5,25 +5,10 @@
 // - recordedAt is always the timestamp of the most recent event that triggered the emission.
 
 import { NextRequest, NextResponse } from "next/server";
-import { getFeedData } from "@/lib/adafruit-io";
-import { createSensorReading, getLatestSensorReading } from "@/services/sensor-service";
-import { getDeviceInZone } from "@/services/device-service";
+import { syncZoneSensorReadings } from "@/services/sensor-service";
 import { getZone } from "@/services/zone-service";
 import { verifyToken, COOKIE_NAME } from "@/lib/auth";
 import { getUserById } from "@/services/auth-service";
-
-interface AdafruitDatum {
-  value: string;
-  created_at: string;
-}
-
-type MetricKey = "soilMoisture" | "temperature" | "humidity";
-
-interface BufferState {
-  soilMoisture: number | null;
-  temperature: number | null;
-  humidity: number | null;
-}
 
 export async function POST(request: NextRequest) {
   const token = request.cookies.get(COOKIE_NAME)?.value
@@ -47,78 +32,23 @@ export async function POST(request: NextRequest) {
   if (!zone) return NextResponse.json({ error: 'Zone not found' }, { status: 404 })
 
   try {
-    // Zone → devices in zone by type → feedKey (required)
-    const [soilDevice, tempDevice, humDevice] = await Promise.all([
-      getDeviceInZone(zoneId, "SOIL_MOISTURE_SENSOR"),
-      getDeviceInZone(zoneId, "DHT20_TEMPERATURE_SENSOR"),
-      getDeviceInZone(zoneId, "DHT20_HUMIDITY_SENSOR"),
-    ]);
+    const result = await syncZoneSensorReadings(zoneId, credentials)
 
-    if (!soilDevice?.feedKey || !tempDevice?.feedKey || !humDevice?.feedKey) {
+    if (result.skipped) {
       return NextResponse.json(
         { error: "Sensor devices in this zone are missing feed key configuration" },
-        { status: 422 }
-      );
+        { status: 422 },
+      )
     }
 
-    const soilFeedKey = soilDevice.feedKey;
-    const tempFeedKey = tempDevice.feedKey;
-    const humFeedKey = humDevice.feedKey;
-
-    // Use the last stored reading as the lower bound for dedup
-    const lastStored = await getLatestSensorReading(zoneId).then(r => r?.recordedAt ? new Date(r.recordedAt) : null);
-
-    // Fetch new data from all 3 feeds since the last stored reading
-    const startTime = lastStored?.toISOString();
-    const [soilData, tempData, humData] = await Promise.all([
-      getFeedData(soilFeedKey, credentials, startTime ? { start_time: startTime } : undefined),
-      getFeedData(tempFeedKey, credentials, startTime ? { start_time: startTime } : undefined),
-      getFeedData(humFeedKey, credentials, startTime ? { start_time: startTime } : undefined),
-    ]);
-
-    // Tag each datum with its metric, parse value, and filter out already-stored or invalid entries
-    type TaggedDatum = { metric: MetricKey; value: number; ts: Date };
-    const tagged: TaggedDatum[] = [
-      ...(soilData as AdafruitDatum[]).map(d => ({ metric: "soilMoisture" as MetricKey, value: parseFloat(d.value), ts: new Date(d.created_at) })),
-      ...(tempData as AdafruitDatum[]).map(d => ({ metric: "temperature" as MetricKey, value: parseFloat(d.value), ts: new Date(d.created_at) })),
-      ...(humData as AdafruitDatum[]).map(d => ({ metric: "humidity" as MetricKey, value: parseFloat(d.value), ts: new Date(d.created_at) })),
-    ]
-      .filter(d => isFinite(d.value) && (!lastStored || d.ts > lastStored))
-      .sort((a, b) => a.ts.getTime() - b.ts.getTime());
-
-    if (tagged.length === 0) {
-      return NextResponse.json({ inserted: 0, message: "No new data from any feed." });
+    if (result.inserted === 0) {
+      return NextResponse.json({ inserted: 0, message: "No new data from any feed." })
     }
 
-    // Sliding buffer: emit a reading whenever all 3 metrics are populated and any one changes.
-    // recordedAt = the timestamp of the event that triggered the emission.
-    const buffer: BufferState = { soilMoisture: null, temperature: null, humidity: null };
-    const toInsert: { soilMoisture: number; temperature: number; humidity: number; recordedAt: Date }[] = [];
-
-    for (const datum of tagged) {
-      buffer[datum.metric] = datum.value;
-
-      if (buffer.soilMoisture !== null && buffer.temperature !== null && buffer.humidity !== null) {
-        toInsert.push({
-          soilMoisture: buffer.soilMoisture,
-          temperature: buffer.temperature,
-          humidity: buffer.humidity,
-          recordedAt: datum.ts, // timestamp of the latest update that completed the buffer
-        });
-      }
-    }
-
-    if (toInsert.length === 0) {
-      return NextResponse.json({
-        inserted: 0,
-        message: "Not enough data — one or more sensor feeds had no readings.",
-      });
-    }
-
-    const inserts = await Promise.all(toInsert.map(r => createSensorReading({ ...r, zoneId })));
-    return NextResponse.json({ inserted: inserts.length });
+    return NextResponse.json({ inserted: result.inserted })
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json({ error: message }, { status: 502 });
   }
 }
+

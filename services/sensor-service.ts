@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import prisma from '../lib/prisma'
 import type { SensorReading } from '../lib/generated/prisma/client'
+import { getFeedData } from '@/lib/adafruit-io'
+import { getDeviceInZone } from '@/services/device-service'
 
 // ─── SensorReading CRUD ───────────────────────────────────────────────────────
 
@@ -53,5 +55,87 @@ export async function createSensorReadingsBatch(data: any[]) {
     skipDuplicates: true,
   });
   return result.count;
+}
+
+// ─── Zone sensor-feed sync (shared by the frontend and cron routes) ───────────
+
+type MetricKey = "soilMoisture" | "temperature" | "humidity";
+
+interface AdafruitDatum {
+  value: string;
+  created_at: string;
+}
+
+export interface SyncZoneResult {
+  zoneId:   string;
+  inserted: number;
+  skipped?: string; // reason when the zone was skipped without error
+}
+
+/**
+ * Pulls the three Adafruit IO sensor feeds for a zone and batch-inserts new
+ * readings using a sliding-buffer strategy:
+ *   - Only emits a DB row once all three metrics are present in the buffer.
+ *   - Deduplicates against the latest stored reading (fetches only newer data).
+ *   - Returns the number of rows inserted; `skipped` is set when devices are
+ *     misconfigured rather than throwing so callers can handle it gracefully.
+ */
+export async function syncZoneSensorReadings(
+  zoneId: string,
+  credentials: { username: string; key: string },
+): Promise<SyncZoneResult> {
+  const [soilDevice, tempDevice, humDevice] = await Promise.all([
+    getDeviceInZone(zoneId, "SOIL_MOISTURE_SENSOR"),
+    getDeviceInZone(zoneId, "DHT20_TEMPERATURE_SENSOR"),
+    getDeviceInZone(zoneId, "DHT20_HUMIDITY_SENSOR"),
+  ]);
+
+  if (!soilDevice?.feedKey || !tempDevice?.feedKey || !humDevice?.feedKey) {
+    return { zoneId, inserted: 0, skipped: "missing feed keys" };
+  }
+
+  // Only fetch data newer than the last stored reading to avoid duplicates
+  const lastStored = await getLatestSensorReading(zoneId).then(
+    (r) => (r?.recordedAt ? new Date(r.recordedAt) : null),
+  );
+  const params = lastStored ? { start_time: lastStored.toISOString() } : undefined;
+
+  const [soilData, tempData, humData] = await Promise.all([
+    getFeedData(soilDevice.feedKey, credentials, params),
+    getFeedData(tempDevice.feedKey, credentials, params),
+    getFeedData(humDevice.feedKey, credentials, params),
+  ]);
+
+  type TaggedDatum = { metric: MetricKey; value: number; ts: Date };
+  const tagged: TaggedDatum[] = [
+    ...(soilData as AdafruitDatum[]).map((d) => ({ metric: "soilMoisture" as MetricKey, value: parseFloat(d.value), ts: new Date(d.created_at) })),
+    ...(tempData as AdafruitDatum[]).map((d) => ({ metric: "temperature"  as MetricKey, value: parseFloat(d.value), ts: new Date(d.created_at) })),
+    ...(humData  as AdafruitDatum[]).map((d) => ({ metric: "humidity"     as MetricKey, value: parseFloat(d.value), ts: new Date(d.created_at) })),
+  ]
+    .filter((d) => isFinite(d.value) && (!lastStored || d.ts > lastStored))
+    .sort((a, b) => a.ts.getTime() - b.ts.getTime());
+
+  if (tagged.length === 0) return { zoneId, inserted: 0 };
+
+  // Sliding buffer: emit one DB row each time all three slots are filled
+  const buffer: Record<MetricKey, number | null> = { soilMoisture: null, temperature: null, humidity: null };
+  const toInsert: { soilMoisture: number; temperature: number; humidity: number; recordedAt: Date }[] = [];
+
+  for (const datum of tagged) {
+    buffer[datum.metric] = datum.value;
+    if (buffer.soilMoisture !== null && buffer.temperature !== null && buffer.humidity !== null) {
+      toInsert.push({
+        soilMoisture: buffer.soilMoisture,
+        temperature:  buffer.temperature,
+        humidity:     buffer.humidity,
+        recordedAt:   datum.ts,
+      });
+    }
+  }
+
+  if (toInsert.length === 0) return { zoneId, inserted: 0 };
+
+  await Promise.all(toInsert.map((r) => createSensorReading({ ...r, zoneId })));
+  return { zoneId, inserted: toInsert.length };
 }
 
