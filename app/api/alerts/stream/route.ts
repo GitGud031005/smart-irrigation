@@ -16,38 +16,12 @@ import { subscribeToFeed, unsubscribeFromFeed } from "@/lib/mqtt";
 import { verifyToken, COOKIE_NAME } from "@/lib/auth";
 import { getUserById } from "@/services/auth-service";
 import { createAlert } from "@/services/alert-service";
-import type { AlertSeverity, AlertType, AlertActor } from "@/models/alert";
+import { AlertFactory } from "@/lib/factories/alert-factory";
 
 export const dynamic = "force-dynamic";
 
 /** The Adafruit IO feed key that the IoT gateway publishes audit events to. */
 const AUDIT_FEED_KEY = "audit-log";
-
-const VALID_SEVERITIES = new Set<string>(["INFO", "WARNING", "CRITICAL"]);
-const VALID_TYPES      = new Set<string>(["DEVICE_STATUS", "PLANT_STATUS", "IRRIGATION_EVENT"]);
-const VALID_ACTORS     = new Set<string>(["USER", "SYSTEM", "AI"]);
-
-function parseMqttPayload(raw: string): {
-  message: string;
-  severity: AlertSeverity;
-  type: AlertType;
-  actor: AlertActor;
-  zoneId?: string;
-} {
-  try {
-    const obj = JSON.parse(raw);
-    return {
-      message:  typeof obj.message  === "string" ? obj.message  : raw,
-      severity: VALID_SEVERITIES.has(obj.severity) ? (obj.severity as AlertSeverity) : "INFO",
-      type:     VALID_TYPES.has(obj.type)           ? (obj.type     as AlertType)     : "DEVICE_STATUS",
-      actor:    VALID_ACTORS.has(obj.actor)          ? (obj.actor    as AlertActor)    : "SYSTEM",
-      zoneId:   typeof obj.zoneId === "string"       ? obj.zoneId                     : undefined,
-    };
-  } catch {
-    // Plain-text payload — treat as an informational system message
-    return { message: raw, severity: "INFO", type: "DEVICE_STATUS", actor: "SYSTEM" };
-  }
-}
 
 export async function GET(request: NextRequest) {
   // Auth
@@ -88,7 +62,7 @@ export async function GET(request: NextRequest) {
       };
 
       const handler = async (_feedKey: string, raw: string) => {
-        const parsed = parseMqttPayload(raw);
+        const parsed = AlertFactory.fromMqttPayload(raw);
 
         // Persist to DB
         let saved: { id: string; createdAt: Date };

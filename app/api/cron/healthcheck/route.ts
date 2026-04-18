@@ -13,7 +13,8 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { createAlert } from "@/services/alert-service";
 import { connectMqtt } from "@/lib/mqtt";
-import type { DeviceType } from "@/lib/generated/prisma/client";
+import { AlertFactory, getDeviceLabel } from "@/lib/factories/alert-factory";
+import { AuditPayloadFactory } from "@/lib/factories/audit-payload-factory";
 
 export const dynamic = "force-dynamic";
 
@@ -23,21 +24,8 @@ const STALE_THRESHOLD_MS = 60_000; // 1 minute
 /** Adafruit IO feed key that the audit-log SSE stream subscribes to. */
 const AUDIT_FEED_KEY = "audit-log";
 
-const DEVICE_TYPE_LABEL: Record<DeviceType, string> = {
-  SOIL_MOISTURE_SENSOR:     "Soil Moisture Sensor",
-  DHT20_TEMPERATURE_SENSOR: "DHT20 Temperature Sensor",
-  DHT20_HUMIDITY_SENSOR:    "DHT20 Humidity Sensor",
-  RELAY_MODULE:             "Relay Module",
-  ESP32:                    "ESP32",
-};
-
-function deviceLabel(deviceType: DeviceType | null, id: string): string {
-  if (deviceType && DEVICE_TYPE_LABEL[deviceType]) return DEVICE_TYPE_LABEL[deviceType];
-  return `Device ${id.slice(0, 8)}`;
-}
-
-/** Publish a JSON payload to the audit-log feed using the system Adafruit credentials. */
-async function publishAuditToMqtt(payload: object): Promise<void> {
+/** Publish a serialised JSON string to the audit-log feed. */
+async function publishAuditToMqtt(message: string): Promise<void> {
   const username = process.env.ADAFRUIT_IO_USERNAME;
   const key = process.env.ADAFRUIT_IO_KEY;
   if (!username || !key) return;
@@ -45,7 +33,6 @@ async function publishAuditToMqtt(payload: object): Promise<void> {
   const credentials = { username, key };
   const mqttClient = connectMqtt(credentials);
   const topic = `${username}/feeds/${AUDIT_FEED_KEY}`;
-  const message = JSON.stringify(payload);
 
   await new Promise<void>((resolve) => {
     // Timeout 3 giây phòng hờ MQTT không thể kết nối (bị chặn port)
@@ -106,31 +93,21 @@ export async function GET(request: NextRequest) {
   // For each stale device: persist alert + publish to MQTT
   const results = await Promise.allSettled(
     staleDevices.map(async (device) => {
-      const label   = deviceLabel(device.deviceType, device.id);
-      const message = `${label} lost connection (last seen: ${device.lastActiveAt?.toISOString() ?? "unknown"})`;
+      const label    = getDeviceLabel(device.deviceType, device.id);
+      const lastSeen = device.lastActiveAt ? device.lastActiveAt.toISOString() : "unknown";
+      const alertInput = AlertFactory.deviceOffline(
+        `${label} lost connection (last seen: ${lastSeen})`,
+        device.zoneId,
+      );
 
       // 1. Persist alert to DB
-      const alert = await createAlert({
-        zoneId:   device.zoneId ?? undefined,
-        message,
-        severity: "CRITICAL",
-        type:     "DEVICE_STATUS",
-        actor:    "SYSTEM",
-      });
+      const alert = await createAlert(alertInput);
 
       // 2. Publish to Adafruit IO audit-log feed so the live SSE stream picks it up
-      await publishAuditToMqtt({
-        zone:     device.zone.name,
-        severity: "CRITICAL",
-        type:     "DEVICE_STATUS",
-        actor:    "SYSTEM",
-        message,
-        ts:       alert.createdAt instanceof Date
-          ? alert.createdAt.toISOString()
-          : new Date().toISOString(),
-      });
+      const payload = AuditPayloadFactory.fromAlert(alertInput, device.zone.name, alert.createdAt);
+      await publishAuditToMqtt(AuditPayloadFactory.serialize(payload));
 
-      console.log(`[Reaper] Swept ${device.id} (${label})`);
+      console.log(`[Reaper] Swept ${device.id} (${alertInput.message})`);
       return device.id;
     })
   );

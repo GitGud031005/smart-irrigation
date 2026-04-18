@@ -5,6 +5,7 @@ import { toJsonSafe } from '@/lib/utils'
 import type { AlertSeverity, AlertType, AlertActor } from '@/models/alert'
 import { validate, createAlertSchema } from '@/lib/validators'
 import { verifyApiKey } from '@/lib/api-key'
+import { AlertFactory } from '@/lib/factories/alert-factory'
 
 export async function GET(request: NextRequest) {
 	const { searchParams } = request.nextUrl
@@ -33,7 +34,8 @@ export async function POST(request: NextRequest) {
 	const v = validate(createAlertSchema, body)
 	if (!v.success) return NextResponse.json({ error: v.error }, { status: 400 })
 	try {
-		const a = await createAlert({ ...v.data, zoneId: v.data.zoneId ?? undefined })
+		const alertInput = AlertFactory.fromGatewayBody(v.data)
+		const a = await createAlert(alertInput)
 		return new NextResponse(JSON.stringify(toJsonSafe(a)), { headers: { 'Content-Type': 'application/json' }, status: 201 })
 	} catch (err) {
 		const message = err instanceof Error ? err.message : 'Unknown error'
