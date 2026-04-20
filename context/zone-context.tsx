@@ -32,8 +32,14 @@ export function ZoneProvider({ children }: { children: React.ReactNode }) {
   const fetchZoneStats = useCallback(async (zoneList: Zone[]) => {
     if (zoneList.length === 0) return;
     const [relayDevices, soilResults] = await Promise.all([
-      apiCall<{ id: string; zoneId: string | null; status: string }[]>('/api/devices?deviceType=RELAY_MODULE')
-        .catch(() => [] as { id: string; zoneId: string | null; status: string }[]),
+      // Sync relay status from Adafruit IO on every load so the UI always
+      // reflects the physical pump state rather than a stale DB value.
+      apiCall<{ id: string; zoneId: string | null; status: string }[]>('/api/devices/relay/sync')
+        .catch(() =>
+          // Fall back to plain DB read if sync fails (e.g. missing Adafruit creds)
+          apiCall<{ id: string; zoneId: string | null; status: string }[]>('/api/devices?deviceType=RELAY_MODULE')
+            .catch(() => [] as { id: string; zoneId: string | null; status: string }[])
+        ),
       Promise.all(
         zoneList.map(z =>
           apiCall<{ soilMoisture: number | null }[]>(
