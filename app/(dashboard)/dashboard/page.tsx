@@ -160,6 +160,23 @@ export default function DashboardPage() {
     }
   });
 
+  // SSE: pump/relay feed — keeps pumpState in sync when the physical device
+  // or another client toggles the pump without going through this browser tab.
+  const pumpSseUrl = currentZoneId
+    ? `/api/devices/relay/stream?zoneId=${encodeURIComponent(currentZoneId)}`
+    : null;
+
+  useSSE(pumpSseUrl, (event) => {
+    try {
+      const data = JSON.parse(event.data as string);
+      if (data.type === "pump" && currentZoneId) {
+        updateRelayStatus(currentZoneId, data.status);
+      }
+    } catch (e) {
+      console.error("[SSE pump] failed to parse message:", event.data, e);
+    }
+  });
+
   // Reset sensor statuses whenever the selected zone changes
   useEffect(() => {
     setSensorStatuses({ temperature: null, humidity: null, soilMoisture: null });
