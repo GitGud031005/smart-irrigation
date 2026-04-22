@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server'
 import { getDevice, updateDevice, deleteDevice } from '@/services/device-service'
 import { createIrrigationEvent, updateIrrigationEvent, getLatestOpenIrrigationEvent } from '@/services/irrigation-service'
@@ -7,6 +6,8 @@ import { verifyToken, COOKIE_NAME } from '@/lib/auth'
 import { getUserById } from '@/services/auth-service'
 import { toJsonSafe } from '@/lib/utils'
 import { validate, updateDeviceSchema } from '@/lib/validators'
+import { verifyApiKey } from '@/lib/api-key'
+import type { DeviceStatus } from '@/lib/generated/prisma/client'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ deviceId: string }> }) {
 	const { deviceId } = await params
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ deviceId: string }> }) {
 	const { deviceId } = await params
-	let body: any
+	let body: Record<string, unknown>
 	try { body = await request.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
 
 	const device = await getDevice(deviceId)
@@ -103,6 +104,38 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 	try {
 		const d = await deleteDevice(deviceId)
 		return new NextResponse(JSON.stringify(toJsonSafe(d)), { headers: { 'Content-Type': 'application/json' } })
+	} catch (err) {
+		const message = err instanceof Error ? err.message : 'Unknown error'
+		return NextResponse.json({ error: message }, { status: 400 })
+	}
+}
+
+// PATCH /api/devices/[deviceId]
+// Gateway-only: update status and/or lastActiveAt without triggering pump control.
+// Auth: X-API-Key header.
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ deviceId: string }> }) {
+	const auth = verifyApiKey(request)
+	if (!auth.ok) return auth.error
+
+	const { deviceId } = await params
+
+	let body: { status?: DeviceStatus; lastActiveAt?: string }
+	try { body = await request.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
+
+	const { status, lastActiveAt } = body
+	if (!status && !lastActiveAt) {
+		return NextResponse.json({ error: 'Provide at least one of: status, lastActiveAt' }, { status: 400 })
+	}
+
+	const device = await getDevice(deviceId)
+	if (!device) return NextResponse.json({ error: 'Device not found' }, { status: 404 })
+
+	try {
+		const updated = await updateDevice(deviceId, {
+			...(status && { status }),
+			...(lastActiveAt && { lastActiveAt: new Date(lastActiveAt) }),
+		})
+		return NextResponse.json(toJsonSafe(updated))
 	} catch (err) {
 		const message = err instanceof Error ? err.message : 'Unknown error'
 		return NextResponse.json({ error: message }, { status: 400 })
