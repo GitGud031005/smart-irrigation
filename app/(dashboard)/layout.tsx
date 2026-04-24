@@ -13,11 +13,9 @@ import {
   LayoutDashboard,
   Package,
   ChevronRight,
-  Calendar,
   ClipboardList,
   Database,
   Home,
-  Bell,
   ChevronDown,
   MapPin,
   Sliders,
@@ -61,7 +59,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (pathname.startsWith("/zones")) return "Zones";
     if (pathname.startsWith("/profiles")) return "Profiles";
     if (pathname.startsWith("/schedules")) return "Schedules";
-    if (pathname.startsWith("/scheduler")) return "AI Scheduler";
     if (pathname.startsWith("/audit-logs")) return "Audit Logs";
     if (pathname.startsWith("/data-logs")) return "Data Logs";
     return "Dashboard";
@@ -199,13 +196,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <Link href="/schedules" className={`w-full flex items-center justify-between px-5 py-2.5 group ${currentPage === "Schedules" ? "bg-white/10 border-l-4 border-green-400" : "hover:bg-white/5"} transition-colors`}>
             <div className="flex items-center gap-4">
               <Clock className="w-4 h-4" /> Schedules
-            </div>
-            <ChevronRight className="w-3 h-3 opacity-50 hidden group-hover:inline-flex transition-opacity" />
-          </Link>
-
-          <Link href="/scheduler" className={`w-full flex items-center justify-between px-5 py-2.5 group ${currentPage === "AI Scheduler" ? "bg-white/10 border-l-4 border-green-400" : "hover:bg-white/5"} transition-colors`}>
-            <div className="flex items-center gap-4">
-              <Calendar className="w-4 h-4" /> AI Scheduler
             </div>
             <ChevronRight className="w-3 h-3 opacity-50 hidden group-hover:inline-flex transition-opacity" />
           </Link>
