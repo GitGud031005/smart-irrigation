@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import { Thermometer, Droplets, Sprout, Power } from "lucide-react";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { Thermometer, Droplets, Sprout, Power, Download } from "lucide-react";
 import { apiCall } from "@/lib/api";
 import { useZones } from "@/hooks/use-zones";
 import { useSSE } from "@/hooks/use-sse";
@@ -55,6 +55,8 @@ function soilColorClasses(val: number | null | undefined, minMoisture: number = 
 export default function DashboardPage() {
   const { zones, relayByZone, soilByZone, updateRelayStatus, updateSoilMoisture } = useZones();
   const [timeFilter, setTimeFilter] = useState<"daily" | "weekly">("daily");
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
   const [profiles, setProfiles] = useState<IrrigationProfile[]>([]);
   const [currentZoneId, setCurrentZoneId] = useState<string | null>(null);
   const [initialData, setInitialData] = useState<SensorSnapshot | null>(null);
@@ -182,6 +184,31 @@ export default function DashboardPage() {
     setSensorStatuses({ temperature: null, humidity: null, soilMoisture: null });
   }, [currentZoneId]);
 
+  // Close export menu on outside click
+  useEffect(() => {
+    if (!exportMenuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setExportMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [exportMenuOpen]);
+
+  const handleExport = (format: "csv" | "json") => {
+    setExportMenuOpen(false);
+    const now = new Date();
+    const since = new Date(now.getTime() - (timeFilter === "daily" ? 24 : 7 * 24) * 60 * 60 * 1000);
+    const params = new URLSearchParams({
+      format,
+      startDate: since.toISOString(),
+      endDate: now.toISOString(),
+      ...(currentZoneId ? { zoneId: currentZoneId } : {}),
+    });
+    window.location.href = `/api/export?${params.toString()}`;
+  };
+
   // Pump handlers
   const togglePump = async () => {
     if (!relayDeviceId || !currentZoneId) return;
@@ -235,19 +262,52 @@ export default function DashboardPage() {
       {/* Page Header & Time Filter */}
       <div className="mb-4 flex justify-between items-center shrink-0">
         <h2 className="text-xl font-medium text-slate-800">My Dashboard</h2>
-        <div className="flex bg-white rounded-sm shadow-sm border border-[#e0e0e0] overflow-hidden">
-          <button 
-            onClick={() => setTimeFilter("daily")} 
-            className={`px-3 py-1.5 text-[11px] font-bold uppercase border-r border-[#e0e0e0] transition-colors ${timeFilter === "daily" ? "border-b-2 border-b-[#00695c] text-[#00695c]" : "border-b-2 border-b-transparent hover:text-[#00695c]"}`}
-          >
-            Daily
-          </button>
-          <button 
-            onClick={() => setTimeFilter("weekly")} 
-            className={`px-3 py-1.5 text-[11px] font-bold uppercase transition-colors ${timeFilter === "weekly" ? "border-b-2 border-b-[#00695c] text-[#00695c]" : "border-b-2 border-b-transparent hover:text-[#00695c]"}`}
-          >
-            Weekly
-          </button>
+        <div className="flex items-center gap-2">
+          <div className="flex bg-white rounded-sm shadow-sm border border-[#e0e0e0] overflow-hidden">
+            <button 
+              onClick={() => setTimeFilter("daily")} 
+              className={`px-3 py-1.5 text-[11px] font-bold uppercase border-r border-[#e0e0e0] transition-colors ${timeFilter === "daily" ? "border-b-2 border-b-[#00695c] text-[#00695c]" : "border-b-2 border-b-transparent hover:text-[#00695c]"}`}
+            >
+              Daily
+            </button>
+            <button 
+              onClick={() => setTimeFilter("weekly")} 
+              className={`px-3 py-1.5 text-[11px] font-bold uppercase transition-colors ${timeFilter === "weekly" ? "border-b-2 border-b-[#00695c] text-[#00695c]" : "border-b-2 border-b-transparent hover:text-[#00695c]"}`}
+            >
+              Weekly
+            </button>
+          </div>
+
+          {/* Export dropdown */}
+          <div className="relative" ref={exportMenuRef}>
+            <button
+              onClick={() => setExportMenuOpen(v => !v)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold uppercase bg-white rounded-sm shadow-sm border transition-colors ${
+                exportMenuOpen
+                  ? "border-[#00695c] text-[#00695c]"
+                  : "border-[#e0e0e0] hover:border-[#00695c] hover:text-[#00695c]"
+              }`}
+            >
+              <Download className="w-3 h-3" />
+              Export
+            </button>
+            {exportMenuOpen && (
+              <div className="absolute right-0 mt-1 w-40 bg-white rounded-sm shadow-md border border-[#e0e0e0] z-20 overflow-hidden">
+                <button
+                  onClick={() => handleExport("csv")}
+                  className="w-full text-left px-3 py-2 text-[11px] font-medium hover:bg-[#f5f5f5] transition-colors"
+                >
+                  Download CSV
+                </button>
+                <button
+                  onClick={() => handleExport("json")}
+                  className="w-full text-left px-3 py-2 text-[11px] font-medium hover:bg-[#f5f5f5] transition-colors border-t border-[#eee]"
+                >
+                  Download JSON
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
