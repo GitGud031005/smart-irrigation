@@ -33,10 +33,10 @@ export async function deleteIrrigationEvent(id: string): Promise<IrrigationEvent
 	return prisma.irrigationEvent.delete({ where: { id } })
 }
 
-/** Returns the latest open (no endTime) irrigation event. */
-export async function getLatestOpenIrrigationEvent(): Promise<IrrigationEvent | null> {
+/** Returns the latest open (no endTime) irrigation event, optionally scoped to a zone. */
+export async function getLatestOpenIrrigationEvent(zoneId?: string): Promise<IrrigationEvent | null> {
 	return prisma.irrigationEvent.findFirst({
-		where: { endTime: null },
+		where: { endTime: null, ...(zoneId ? { zoneId } : {}) },
 		orderBy: { startTime: 'desc' },
 	})
 }
