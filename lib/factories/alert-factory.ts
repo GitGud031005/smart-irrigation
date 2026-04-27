@@ -71,7 +71,7 @@ export const AlertFactory = {
         severity: VALID_SEVERITIES.has(obj.severity) ? (obj.severity as AlertSeverity) : "INFO",
         type:     VALID_TYPES.has(obj.type)           ? (obj.type     as AlertType)     : "DEVICE_STATUS",
         actor:    VALID_ACTORS.has(obj.actor)          ? (obj.actor    as AlertActor)    : "SYSTEM",
-        zoneId:   typeof obj.zoneId === "string"       ? obj.zoneId                     : undefined,
+        zoneId:   typeof obj.zoneId   === "string"    ? obj.zoneId   : undefined,
       };
     } catch {
       return { message: raw, severity: "INFO", type: "DEVICE_STATUS", actor: "SYSTEM" };
@@ -92,9 +92,9 @@ export const AlertFactory = {
     return {
       message:  body.message,
       severity: VALID_SEVERITIES.has(body.severity ?? "") ? (body.severity as AlertSeverity) : "INFO",
-      type:     body.type     as AlertType,
-      actor:    body.actor    as AlertActor,
-      zoneId:   body.zoneId   ?? undefined,
+      type:     body.type  as AlertType,
+      actor:    body.actor as AlertActor,
+      zoneId:   body.zoneId ?? undefined,
     };
   },
 };

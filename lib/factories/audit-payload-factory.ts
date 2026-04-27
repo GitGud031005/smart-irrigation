@@ -6,14 +6,18 @@
  * so the payload shape is always consistent with what the SSE stream handler and
  * the IoT gateway both expect:
  *
- *   { zone, severity, type, actor, message, ts }
+ *   { alertId?, zoneId?, severity, type, actor, message, ts }
+ *
+ * Zone names are intentionally NOT included — the audit-log page resolves
+ * them from the zones map using zoneId.
  */
 
 import type { AlertSeverity, AlertType, AlertActor } from "@/models/alert";
 import type { AlertInput } from "./alert-factory";
 
 export interface AuditPayload {
-  zone:     string;
+  alertId?: string;  // set when already persisted — SSE stream reuses it
+  zoneId?:  string;
   severity: AlertSeverity;
   type:     AlertType;
   actor:    AlertActor;
@@ -23,16 +27,18 @@ export interface AuditPayload {
 
 export const AuditPayloadFactory = {
   /**
-   * Build from a saved alert + the human-readable zone name.
+   * Build from a saved alert input + its persisted metadata.
    * `createdAt` can be a Date or ISO string (Prisma returns Date on server).
+   * Pass `alertId` so the SSE stream can reuse the existing DB record.
    */
   fromAlert(
     input: AlertInput,
-    zoneName: string,
     createdAt: Date | string,
+    alertId?: string,
   ): AuditPayload {
     return {
-      zone:     zoneName,
+      alertId:  alertId,
+      zoneId:   input.zoneId,
       severity: input.severity,
       type:     input.type,
       actor:    input.actor,

@@ -15,7 +15,7 @@ import { NextRequest } from "next/server";
 import { subscribeToFeed, unsubscribeFromFeed } from "@/lib/mqtt";
 import { verifyToken, COOKIE_NAME } from "@/lib/auth";
 import { getUserById } from "@/services/auth-service";
-import { createAlert } from "@/services/alert-service";
+import { createAlert, getAlert } from "@/services/alert-service";
 import { AlertFactory } from "@/lib/factories/alert-factory";
 
 export const dynamic = "force-dynamic";
@@ -63,13 +63,20 @@ export async function GET(request: NextRequest) {
 
       const handler = async (_feedKey: string, raw: string) => {
         const parsed = AlertFactory.fromMqttPayload(raw);
+        const alertIdFromPayload: string | undefined = (() => {
+          try { return JSON.parse(raw)?.alertId ?? undefined; } catch { return undefined; }
+        })();
 
-        // Persist to DB
-        let saved: { id: string; createdAt: Date };
+        // If the server already persisted this alert (pump route / healthcheck),
+        // reuse it — don't create a duplicate.
+        let saved: { id: string; createdAt: Date | string };
         try {
-          saved = await createAlert(parsed);
+          if (alertIdFromPayload) {
+            saved = (await getAlert(alertIdFromPayload)) ?? { id: alertIdFromPayload, createdAt: new Date() };
+          } else {
+            saved = await createAlert(parsed);
+          }
         } catch {
-          // DB write failed — still emit to UI so nothing is lost visually
           saved = { id: `live-${Date.now()}`, createdAt: new Date() };
         }
 

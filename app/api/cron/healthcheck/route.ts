@@ -75,8 +75,7 @@ export async function GET(request: NextRequest) {
 
   // Find ACTIVE devices whose last heartbeat is older than the threshold
   const staleDevices = await prisma.device.findMany({
-    where:   { status: "ACTIVE", lastActiveAt: { lt: cutoff } },
-    include: { zone: { select: { name: true } } },
+    where: { status: "ACTIVE", lastActiveAt: { lt: cutoff } },
   });
 
   if (staleDevices.length === 0) {
@@ -104,7 +103,7 @@ export async function GET(request: NextRequest) {
       const alert = await createAlert(alertInput);
 
       // 2. Publish to Adafruit IO audit-log feed so the live SSE stream picks it up
-      const payload = AuditPayloadFactory.fromAlert(alertInput, device.zone.name, alert.createdAt);
+      const payload = AuditPayloadFactory.fromAlert(alertInput, alert.createdAt, alert.id);
       await publishAuditToMqtt(AuditPayloadFactory.serialize(payload));
 
       console.log(`[Reaper] Swept ${device.id} (${alertInput.message})`);

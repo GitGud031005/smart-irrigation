@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDevice, updateDevice, deleteDevice } from '@/services/device-service'
+import { getZone } from '@/services/zone-service'
 import { createIrrigationEvent, updateIrrigationEvent, getLatestOpenIrrigationEvent } from '@/services/irrigation-service'
-import { controlPump } from '@/lib/adafruit-io'
+import { createAlert } from '@/services/alert-service'
+import { controlPump, sendData } from '@/lib/adafruit-io'
+import { AuditPayloadFactory } from '@/lib/factories/audit-payload-factory'
 import { verifyToken, COOKIE_NAME } from '@/lib/auth'
 import { getUserById } from '@/services/auth-service'
 import { toJsonSafe } from '@/lib/utils'
@@ -53,19 +56,59 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 			const adafruitResponse = await controlPump(action, credentials, device.feedKey)
 
 			const now = new Date()
+			const zoneId = device.zoneId ?? undefined
+			const zone = zoneId ? await getZone(zoneId) : null
+			const zoneName = zone?.name ?? undefined
+			const auditFeedKey = process.env.ADAFRUIT_IO_FEED_ALERTS
+
 			const updatedDevice = await updateDevice(deviceId, {
 				status: body.status,
 				lastActiveAt: now,
 			})
 
 			let event = null
+			let alert = null
+
 			if (action === '1') {
-				event = await createIrrigationEvent({ startTime: now, zoneId: device.zoneId ?? undefined })
+				// Pump ON — log device status change, open a new irrigation event
+				const deviceStatusMessage = zoneName
+					? `Pump in zone "${zoneName}" turned ON manually by user.`
+					: `Pump turned ON manually by user.`
+				const deviceStatusInput = { message: deviceStatusMessage, type: 'DEVICE_STATUS' as const, actor: 'USER' as const, severity: 'INFO' as const, zoneId }
+				const deviceStatusAlert = await createAlert(deviceStatusInput)
+				if (auditFeedKey) {
+					const dsPayload = AuditPayloadFactory.fromAlert(deviceStatusInput, deviceStatusAlert.createdAt, deviceStatusAlert.id)
+					await sendData(auditFeedKey, AuditPayloadFactory.serialize(dsPayload), credentials)
+				}
+				event = await createIrrigationEvent({ startTime: now, zoneId })
 			} else {
-				const open = await getLatestOpenIrrigationEvent()
+				// Pump OFF — log device status change (always), close the open event if any
+				const deviceStatusMessage = zoneName
+					? `Pump in zone "${zoneName}" turned OFF manually by user.`
+					: `Pump turned OFF manually by user.`
+				const deviceStatusInput = { message: deviceStatusMessage, type: 'DEVICE_STATUS' as const, actor: 'USER' as const, severity: 'INFO' as const, zoneId }
+				const deviceStatusAlert = await createAlert(deviceStatusInput)
+				if (auditFeedKey) {
+					const dsPayload = AuditPayloadFactory.fromAlert(deviceStatusInput, deviceStatusAlert.createdAt, deviceStatusAlert.id)
+					await sendData(auditFeedKey, AuditPayloadFactory.serialize(dsPayload), credentials)
+				}
+
+				const open = await getLatestOpenIrrigationEvent(zoneId)
 				if (open) {
 					const duration = Math.round((now.getTime() - open.startTime.getTime()) / 1000)
+					const mins = Math.floor(duration / 60)
+					const secs = duration % 60
+					const durationLabel = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`
+					const alertMessage = zoneName
+						? `Manual irrigation in zone "${zoneName}" completed. Duration: ${durationLabel}.`
+						: `Manual irrigation completed. Duration: ${durationLabel}.`
 					event = await updateIrrigationEvent(open.id, { endTime: now, duration })
+					const alertInput = { message: alertMessage, type: 'IRRIGATION_EVENT' as const, actor: 'USER' as const, severity: 'INFO' as const, zoneId }
+					alert = await createAlert(alertInput)
+					if (auditFeedKey) {
+						const payload = AuditPayloadFactory.fromAlert(alertInput, alert.createdAt, alert.id)
+						await sendData(auditFeedKey, AuditPayloadFactory.serialize(payload), credentials)
+					}
 				}
 			}
 
@@ -74,6 +117,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 				pump: action,
 				device: toJsonSafe(updatedDevice),
 				event: toJsonSafe(event),
+				alert: toJsonSafe(alert),
 				adafruitResponse,
 			})
 		} catch (error) {
